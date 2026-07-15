@@ -151,6 +151,50 @@ export const getFreightTrains = async (req: Request, res: Response) => {
   }
 };
 
+const mapWeatherCode = (code: number): string => {
+  switch (code) {
+    case 0: return "Clear Sky";
+    case 1:
+    case 2:
+    case 3: return "Partly Cloudy";
+    case 45:
+    case 48: return "Foggy";
+    case 51:
+    case 53:
+    case 55: return "Drizzle";
+    case 61:
+    case 63:
+    case 65: return "Rainy";
+    case 71:
+    case 73:
+    case 75: return "Snowy";
+    case 80:
+    case 81:
+    case 82: return "Rain Showers";
+    case 95:
+    case 96:
+    case 99: return "Thunderstorm";
+    default: return "Partly Cloudy";
+  }
+};
+
+const geocodeCity = async (cityName: string): Promise<{ lat: number; lng: number } | null> => {
+  try {
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=en&format=json`;
+    const res = await fetch(geoUrl);
+    const data: any = await res.json();
+    if (data.results && data.results.length > 0) {
+      return {
+        lat: data.results[0].latitude,
+        lng: data.results[0].longitude
+      };
+    }
+  } catch (e) {
+    console.error(`[GEOCODE-ERROR] Failed to geocode ${cityName}:`, e);
+  }
+  return null;
+};
+
 export const getWeather = async (req: Request, res: Response) => {
   try {
     const { location } = req.query;
@@ -162,15 +206,25 @@ export const getWeather = async (req: Request, res: Response) => {
     let weather = await WeatherCache.findOne({ location: city });
 
     if (!weather) {
-      // In production, fetch weather details via a real Axios call to WeatherAPI or OpenWeatherMap.
-      // We will create and save a high-quality fallback cache instance.
-      weather = new WeatherCache({
-        location: city,
-        temperature: "28°C",
-        condition: "Partly Cloudy",
-        humidity: "62%"
-      });
-      await weather.save();
+      console.log(`[WEATHER] Cache miss for ${city}. Fetching real live weather...`);
+      const coords = await geocodeCity(city) || { lat: 31.5204, lng: 74.3587 };
+      
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,weather_code`;
+      const response = await fetch(weatherUrl);
+      const data: any = await response.json();
+
+      if (data && data.current) {
+        weather = new WeatherCache({
+          location: city,
+          temperature: `${Math.round(data.current.temperature_2m)}°C`,
+          condition: mapWeatherCode(data.current.weather_code),
+          humidity: `${data.current.relative_humidity_2m}%`
+        });
+        await weather.save();
+        console.log(`[WEATHER] Saved fresh live weather to cache for ${city}`);
+      } else {
+        throw new Error("Unable to parse live weather API payload");
+      }
     }
 
     return res.status(200).json({
@@ -180,6 +234,7 @@ export const getWeather = async (req: Request, res: Response) => {
       humidity: weather.humidity
     });
   } catch (error: any) {
+    console.error(`[WEATHER-ERROR]`, error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -195,18 +250,45 @@ export const getPrayerTimes = async (req: Request, res: Response) => {
     let prayer = await PrayerCache.findOne({ location: city });
 
     if (!prayer) {
-      // In production, make a real integration call to Aladhan Prayer API.
-      // We will create and save a high-quality cache instance.
-      prayer = new PrayerCache({
-        location: city,
-        islamicDate: "20 Muharram 1448",
-        fajr: "04:12 AM",
-        dhuhr: "12:30 PM",
-        asr: "04:45 PM",
-        maghrib: "07:15 PM",
-        isha: "08:45 PM"
-      });
-      await prayer.save();
+      console.log(`[PRAYER] Cache miss for ${city}. Fetching real live prayer timings...`);
+      const coords = await geocodeCity(city) || { lat: 31.5204, lng: 74.3587 };
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const prayerUrl = `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.lat}&longitude=${coords.lng}&method=2`;
+      const response = await fetch(prayerUrl);
+      const data: any = await response.json();
+
+      let qiblaDeg = "261° (W)";
+      try {
+        const qiblaUrl = `https://api.aladhan.com/v1/qibla/${coords.lat}/${coords.lng}`;
+        const qiblaRes = await fetch(qiblaUrl);
+        const qiblaData: any = await qiblaRes.json();
+        if (qiblaData && qiblaData.data) {
+          qiblaDeg = `${Math.round(qiblaData.data.direction)}°`;
+        }
+      } catch (qe) {
+        console.error(`[QIBLA-ERROR]`, qe);
+      }
+
+      if (data && data.data && data.data.timings) {
+        const timings = data.data.timings;
+        const hijri = data.data.date.hijri;
+        
+        prayer = new PrayerCache({
+          location: city,
+          islamicDate: `${hijri.day} ${hijri.month.en} ${hijri.year} AH`,
+          fajr: timings.Fajr,
+          dhuhr: timings.Dhuhr,
+          asr: timings.Asr,
+          maghrib: timings.Maghrib,
+          isha: timings.Isha,
+          qiblaDirection: qiblaDeg
+        });
+        await prayer.save();
+        console.log(`[PRAYER] Saved fresh live prayer timings to cache for ${city}`);
+      } else {
+        throw new Error("Unable to parse live prayer API payload");
+      }
     }
 
     return res.status(200).json({
@@ -219,6 +301,7 @@ export const getPrayerTimes = async (req: Request, res: Response) => {
       qiblaDirection: prayer.qiblaDirection
     });
   } catch (error: any) {
+    console.error(`[PRAYER-ERROR]`, error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

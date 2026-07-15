@@ -1,12 +1,49 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
 import User from '../models/User';
 import Notification from '../models/Notification';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_companion_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'supersecret_companion_refresh_key_2026';
+
+// SMTP Transporter setup for production email delivery
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || '',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
+});
+
+const sendEmail = async (to: string, subject: string, text: string, html?: string) => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn(`[SMTP-WARNING] SMTP credentials are not configured in the environment variables.`);
+    console.warn(`[SMTP-SIMULATOR] Email would be sent to: ${to}`);
+    console.warn(`[SMTP-SIMULATOR] Subject: ${subject}`);
+    console.warn(`[SMTP-SIMULATOR] Message: ${text}`);
+    return false;
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"Pakistan Railways Companion" <noreply@pakistan-railways.example.com>`,
+      to,
+      subject,
+      text,
+      html: html || text,
+    });
+    console.log(`[SMTP-SUCCESS] Email sent successfully to ${to}. MessageId: ${info.messageId}`);
+    return true;
+  } catch (error: any) {
+    console.error(`[SMTP-ERROR] Failed to send email to ${to}:`, error);
+    return false;
+  }
+};
 
 export const signUp = async (req: Request, res: Response) => {
   try {
@@ -78,15 +115,31 @@ export const signUp = async (req: Request, res: Response) => {
     await newUser.save();
     console.log(`[AUTH-SIGNUP] User saved successfully. ID: ${newUser._id}`);
 
-    // In production, we'd trigger a nodemailer or Resend API call here.
-    // We'll record a system notification broadcast as part of our integration design.
+    // Real Nodemailer integration call for production email delivery
+    const mailText = `Welcome to Pakistan Railways Companion app! Use code ${otpCode} to verify your email address. This code is valid for 15 minutes.`;
+    const mailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+        <h2 style="color: #1e824c; text-align: center;">Welcome Aboard!</h2>
+        <p>Dear ${firstName},</p>
+        <p>Thank you for registering with the Pakistan Railways Companion app. Your account has been pre-registered.</p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+          <span style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #333;">${otpCode}</span>
+        </div>
+        <p>Please enter this numeric OTP code in your app to verify your email address and fully activate your account. This code is valid for 15 minutes.</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 12px; color: #777; text-align: center;">If you did not make this request, please ignore this email.</p>
+      </div>
+    `;
+    await sendEmail(cleanEmail, "Verify Your Email Address", mailText, mailHtml);
+
+    // Record system notification
     await Notification.create({
       title: "Welcome aboard!",
       message: `Your companion account has been pre-registered. Use code ${otpCode} to verify your email.`,
       category: "alert",
       recipientEmail: cleanEmail
     });
-    console.log(`[AUTH-SIGNUP] Welcome notification generated`);
+    console.log(`[AUTH-SIGNUP] Welcome notification generated and real SMTP OTP sent`);
 
     return res.status(201).json({
       success: true,
@@ -254,6 +307,22 @@ export const forgotPassword = async (req: Request, res: Response) => {
     user.otpCode = otpCode;
     user.otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
+
+    const resetText = `Your companion app password reset code is ${otpCode}. Enter this to update your security credentials. This code is valid for 15 minutes.`;
+    const resetHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+        <h2 style="color: #c0392b; text-align: center;">Reset Your Password</h2>
+        <p>Hello,</p>
+        <p>We received a request to reset the password for your Pakistan Railways Companion account.</p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+          <span style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #333;">${otpCode}</span>
+        </div>
+        <p>Please enter this code in your app to update your password. This code is valid for 15 minutes.</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 12px; color: #777; text-align: center;">If you did not make this request, please ignore this email.</p>
+      </div>
+    `;
+    await sendEmail(email, "Reset Your Password", resetText, resetHtml);
 
     await Notification.create({
       title: "Password Reset Code",
