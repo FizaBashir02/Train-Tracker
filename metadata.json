@@ -1,0 +1,6 @@
+{
+  "name": "Train Tracker",
+  "description": "A complete Pakistan Railways real-time train tracker, schedules, station info, weather, and Namaz timings mobile application.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
