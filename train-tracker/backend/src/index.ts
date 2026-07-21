@@ -9,25 +9,17 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import winston from 'winston';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 
 // Load Environment variables
 dotenv.config();
 
-// Create Express and HTTP Servers
 const app = express();
 const server = http.createServer(app);
 
-// Setup Socket.IO Server
-const io = new SocketServer(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-  },
-});
-
 // Setup Logger
 const logger = winston.createLogger({
-  level: 'info',
+  level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
@@ -39,28 +31,95 @@ const logger = winston.createLogger({
   ],
 });
 
+// CORS Configuration with origin whitelisting support
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy violation: Origin not allowed'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  maxAge: 86400 // 24 hours caching for preflight requests
+};
+
+// Setup Socket.IO Server with authentication and room access verification
+const io = new SocketServer(server, {
+  cors: corsOptions,
+  maxHttpBufferSize: 1e6 // 1MB payload limit for WebSockets
+});
+
+// Socket.IO Middleware Authentication
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.headers['authorization']?.split(' ')[1];
+  if (!token) {
+    // Allow anonymous socket connections for public train tracking if configured, or require auth
+    return next();
+  }
+
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    return next(new Error('Internal server auth configuration error'));
+  }
+
+  jwt.verify(token, jwtSecret, (err: any, decoded: any) => {
+    if (err) {
+      return next(new Error('Unauthorized socket connection'));
+    }
+    socket.data.user = decoded;
+    next();
+  });
+});
+
 // Middleware configurations
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https:", "wss:"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+app.use(cors(corsOptions));
 app.use(compression());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '5mb' })); // Strict payload body limit
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
 // Rate Limiter configuration
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 100, // Limit each IP to 100 requests per window
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many requests from this IP, please try again after 15 minutes',
+  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes' },
 });
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // Stricter limit for authentication endpoints
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many authentication attempts, please try again later' },
+});
+
 app.use('/api/', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/verify-otp', authLimiter);
 
 // Database Connection
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/train-tracker';
 mongoose.connect(mongoUri)
-  .then(() => logger.info('MongoDB Atlas connected successfully.'))
+  .then(() => logger.info('MongoDB connected successfully.'))
   .catch((err) => logger.error(`MongoDB connection error: ${err.message}`));
 
 // Import routes
@@ -69,15 +128,24 @@ import trainRoutes from './routes/trainRoutes';
 import userRoutes from './routes/userRoutes';
 import adminRoutes from './routes/adminRoutes';
 
-// Configure Api endpoints
+// Configure API endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/trains', trainRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Base route
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    uptime: process.uptime(),
+    dbState: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date()
+  });
+});
+
 app.get('/', (req, res) => {
-  res.json({ status: 'healthy', service: 'Pakistan Railways Train Tracker Backend API', timestamp: new Date() });
+  res.json({ status: 'healthy', service: 'Pakistan Railways Train Tracker Backend API' });
 });
 
 // Socket.IO Connection Handler
@@ -85,25 +153,38 @@ io.on('connection', (socket) => {
   logger.info(`Socket client connected: ${socket.id}`);
 
   socket.on('subscribe:train', (data: { trainNumber: string }) => {
-    logger.info(`Client ${socket.id} subscribed to updates for train: ${data.trainNumber}`);
-    socket.join(`train:${data.trainNumber}`);
+    if (!data || !data.trainNumber || typeof data.trainNumber !== 'string') return;
+    const cleanTrainNum = data.trainNumber.trim().toUpperCase();
+    logger.info(`Client ${socket.id} subscribed to updates for train: ${cleanTrainNum}`);
+    socket.join(`train:${cleanTrainNum}`);
   });
 
   socket.on('unsubscribe:train', (data: { trainNumber: string }) => {
-    logger.info(`Client ${socket.id} unsubscribed from updates for train: ${data.trainNumber}`);
-    socket.leave(`train:${data.trainNumber}`);
+    if (!data || !data.trainNumber || typeof data.trainNumber !== 'string') return;
+    const cleanTrainNum = data.trainNumber.trim().toUpperCase();
+    logger.info(`Client ${socket.id} unsubscribed from updates for train: ${cleanTrainNum}`);
+    socket.leave(`train:${cleanTrainNum}`);
   });
 
-  // Locomotive GPS simulation or hardware stream integration
+  // Locomotive telemetry stream - requires conductor or admin socket role
   socket.on('telemetry:stream', (data: { trainNumber: string; lat: number; lng: number; speed: number }) => {
-    logger.info(`Incoming GPS telemetry for train #${data.trainNumber}: [${data.lat}, ${data.lng}], speed: ${data.speed}km/h`);
-    
-    // Broadcast real-time location packets directly to all subscribed passenger clients
-    io.to(`train:${data.trainNumber}`).emit('telemetry:update', {
-      trainNumber: data.trainNumber,
+    const userRole = socket.data?.user?.role;
+    if (userRole !== 'conductor' && userRole !== 'admin') {
+      logger.warn(`Unauthorized telemetry stream attempt by socket: ${socket.id}`);
+      return socket.emit('error', { message: 'Unauthorized telemetry streaming privilege' });
+    }
+
+    if (!data || !data.trainNumber || typeof data.lat !== 'number' || typeof data.lng !== 'number') {
+      return socket.emit('error', { message: 'Invalid telemetry packet format' });
+    }
+
+    const cleanTrainNum = String(data.trainNumber).trim().toUpperCase();
+
+    io.to(`train:${cleanTrainNum}`).emit('telemetry:update', {
+      trainNumber: cleanTrainNum,
       latitude: data.lat,
       longitude: data.lng,
-      speedKmh: data.speed,
+      speedKmh: data.speed || 0,
       timestamp: Date.now()
     });
   });
@@ -113,10 +194,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Global Error Handler Middleware
+// Central Error Handler Middleware (Never exposes internal stack traces)
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error(`Internal server error: ${err.message}`);
-  res.status(500).json({ success: false, message: 'Internal Server Error' });
+  logger.error(`Internal error on ${req.method} ${req.url}: ${err.message}`);
+  res.status(500).json({
+    success: false,
+    message: 'An internal error occurred. Please try again later.'
+  });
 });
 
 // Start Server

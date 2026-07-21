@@ -11,7 +11,13 @@ export interface IUser extends Document {
   profilePictureUrl?: string;
   otpCode?: string;
   otpExpiry?: Date;
+  otpAttempts: number;
+  lastOtpSentAt?: Date;
   refreshToken?: string;
+  tokenVersion: number;
+  failedLoginAttempts: number;
+  lockUntil?: Date;
+  passwordHistory: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,7 +33,13 @@ const UserSchema: Schema = new Schema({
   profilePictureUrl: { type: String },
   otpCode: { type: String },
   otpExpiry: { type: Date },
-  refreshToken: { type: String }
+  otpAttempts: { type: Number, default: 0 },
+  lastOtpSentAt: { type: Date },
+  refreshToken: { type: String },
+  tokenVersion: { type: Number, default: 0 },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date },
+  passwordHistory: [{ type: String }]
 }, {
   timestamps: true
 });

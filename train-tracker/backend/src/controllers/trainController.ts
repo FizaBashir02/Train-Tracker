@@ -7,16 +7,27 @@ import PrayerCache from '../models/PrayerCache';
 import News from '../models/News';
 import Blog from '../models/Blog';
 
+// Helper to escape special regex characters to prevent ReDoS / Regex Injection
+const escapeRegex = (str: string) => {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 export const searchTrains = async (req: Request, res: Response) => {
   try {
     const { source, dest, type } = req.query;
     
     let query: any = {};
-    if (source) query.source = new RegExp(source as string, 'i');
-    if (dest) query.destination = new RegExp(dest as string, 'i');
-    if (type && type !== 'All') query.trainType = type;
+    if (source && typeof source === 'string') {
+      query.source = new RegExp(escapeRegex(source.trim()), 'i');
+    }
+    if (dest && typeof dest === 'string') {
+      query.destination = new RegExp(escapeRegex(dest.trim()), 'i');
+    }
+    if (type && typeof type === 'string' && type !== 'All') {
+      query.trainType = type.trim();
+    }
 
-    const trains = await Train.find(query);
+    const trains = await Train.find(query).limit(100);
     const results = trains.map(t => ({
       trainName: t.trainName,
       trainNumber: t.trainNumber,
@@ -30,23 +41,28 @@ export const searchTrains = async (req: Request, res: Response) => {
 
     return res.status(200).json(results);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error searching trains' });
   }
 };
 
 export const getTrainSchedule = async (req: Request, res: Response) => {
   try {
     const { trainNumber } = req.params;
-    const train = await Train.findOne({ trainNumber: trainNumber.toUpperCase() });
+    if (!trainNumber) {
+      return res.status(400).json({ success: false, message: 'Train number is required' });
+    }
+
+    const cleanTrainNum = String(trainNumber).trim().toUpperCase();
+    const train = await Train.findOne({ trainNumber: cleanTrainNum });
 
     if (!train) {
-      return res.status(404).json({ success: false, message: `Schedule not found for train ${trainNumber}` });
+      return res.status(404).json({ success: false, message: `Schedule not found for train ${cleanTrainNum}` });
     }
 
     const schedule = {
       trainName: train.trainName,
       trainNumber: train.trainNumber,
-      stations: train.stops.map((stop, index) => ({
+      stations: train.stops.map((stop) => ({
         stationName: stop.stationName,
         stationCode: stop.stationCode,
         arrival: stop.arrival,
@@ -62,17 +78,22 @@ export const getTrainSchedule = async (req: Request, res: Response) => {
 
     return res.status(200).json(schedule);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving schedule' });
   }
 };
 
 export const getStationInfo = async (req: Request, res: Response) => {
   try {
     const { stationCode } = req.params;
-    const station = await Station.findOne({ code: stationCode.toUpperCase() });
+    if (!stationCode) {
+      return res.status(400).json({ success: false, message: 'Station code is required' });
+    }
+
+    const cleanCode = String(stationCode).trim().toUpperCase();
+    const station = await Station.findOne({ code: cleanCode });
 
     if (!station) {
-      return res.status(404).json({ success: false, message: `Station info not found for ${stationCode}` });
+      return res.status(404).json({ success: false, message: `Station info not found for ${cleanCode}` });
     }
 
     const info = {
@@ -91,20 +112,24 @@ export const getStationInfo = async (req: Request, res: Response) => {
 
     return res.status(200).json(info);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving station info' });
   }
 };
 
 export const getLiveStatus = async (req: Request, res: Response) => {
   try {
     const { trainNumber } = req.params;
-    const tracking = await Tracking.findOne({ trainNumber: trainNumber.toUpperCase() });
+    if (!trainNumber) {
+      return res.status(400).json({ success: false, message: 'Train number required' });
+    }
+
+    const cleanTrainNum = String(trainNumber).trim().toUpperCase();
+    const tracking = await Tracking.findOne({ trainNumber: cleanTrainNum });
 
     if (!tracking) {
-      // Return a dynamically generated active status if not pre-seeded
-      const train = await Train.findOne({ trainNumber: trainNumber.toUpperCase() });
+      const train = await Train.findOne({ trainNumber: cleanTrainNum });
       if (!train) {
-        return res.status(404).json({ success: false, message: `Train ${trainNumber} not found` });
+        return res.status(404).json({ success: false, message: `Train ${cleanTrainNum} not found` });
       }
 
       const activeTracking = {
@@ -126,13 +151,13 @@ export const getLiveStatus = async (req: Request, res: Response) => {
 
     return res.status(200).json(tracking);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving live status' });
   }
 };
 
 export const getFreightTrains = async (req: Request, res: Response) => {
   try {
-    const freights = await Train.find({ trainType: 'Freight' });
+    const freights = await Train.find({ trainType: 'Freight' }).limit(50);
     const results = freights.map(f => ({
       trainNumber: f.trainNumber,
       trainName: f.trainName,
@@ -147,7 +172,7 @@ export const getFreightTrains = async (req: Request, res: Response) => {
 
     return res.status(200).json(results);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving freight trains' });
   }
 };
 
@@ -198,15 +223,14 @@ const geocodeCity = async (cityName: string): Promise<{ lat: number; lng: number
 export const getWeather = async (req: Request, res: Response) => {
   try {
     const { location } = req.query;
-    if (!location) {
-      return res.status(400).json({ success: false, message: 'Location query parameter is required' });
+    if (!location || typeof location !== 'string') {
+      return res.status(400).json({ success: false, message: 'Valid location query parameter is required' });
     }
 
-    const city = (location as string).trim().toLowerCase();
+    const city = location.trim().toLowerCase();
     let weather = await WeatherCache.findOne({ location: city });
 
     if (!weather) {
-      console.log(`[WEATHER] Cache miss for ${city}. Fetching real live weather...`);
       const coords = await geocodeCity(city) || { lat: 31.5204, lng: 74.3587 };
       
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,weather_code`;
@@ -221,7 +245,6 @@ export const getWeather = async (req: Request, res: Response) => {
           humidity: `${data.current.relative_humidity_2m}%`
         });
         await weather.save();
-        console.log(`[WEATHER] Saved fresh live weather to cache for ${city}`);
       } else {
         throw new Error("Unable to parse live weather API payload");
       }
@@ -234,23 +257,21 @@ export const getWeather = async (req: Request, res: Response) => {
       humidity: weather.humidity
     });
   } catch (error: any) {
-    console.error(`[WEATHER-ERROR]`, error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving weather' });
   }
 };
 
 export const getPrayerTimes = async (req: Request, res: Response) => {
   try {
     const { location } = req.query;
-    if (!location) {
-      return res.status(400).json({ success: false, message: 'Location query parameter is required' });
+    if (!location || typeof location !== 'string') {
+      return res.status(400).json({ success: false, message: 'Valid location query parameter is required' });
     }
 
-    const city = (location as string).trim().toLowerCase();
+    const city = location.trim().toLowerCase();
     let prayer = await PrayerCache.findOne({ location: city });
 
     if (!prayer) {
-      console.log(`[PRAYER] Cache miss for ${city}. Fetching real live prayer timings...`);
       const coords = await geocodeCity(city) || { lat: 31.5204, lng: 74.3587 };
 
       const timestamp = Math.floor(Date.now() / 1000);
@@ -285,7 +306,6 @@ export const getPrayerTimes = async (req: Request, res: Response) => {
           qiblaDirection: qiblaDeg
         });
         await prayer.save();
-        console.log(`[PRAYER] Saved fresh live prayer timings to cache for ${city}`);
       } else {
         throw new Error("Unable to parse live prayer API payload");
       }
@@ -301,25 +321,24 @@ export const getPrayerTimes = async (req: Request, res: Response) => {
       qiblaDirection: prayer.qiblaDirection
     });
   } catch (error: any) {
-    console.error(`[PRAYER-ERROR]`, error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving prayer times' });
   }
 };
 
 export const getNews = async (req: Request, res: Response) => {
   try {
-    const news = await News.find().sort({ createdAt: -1 });
+    const news = await News.find().sort({ createdAt: -1 }).limit(50);
     return res.status(200).json(news);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving news' });
   }
 };
 
 export const getBlogs = async (req: Request, res: Response) => {
   try {
-    const blogs = await Blog.find().sort({ createdAt: -1 });
+    const blogs = await Blog.find().sort({ createdAt: -1 }).limit(50);
     return res.status(200).json(blogs);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Server error retrieving blogs' });
   }
 };
