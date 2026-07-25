@@ -14,6 +14,7 @@ export interface IUser extends Document {
   otpAttempts: number;
   lastOtpSentAt?: Date;
   refreshToken?: string;
+  fcmToken?: string;
   tokenVersion: number;
   failedLoginAttempts: number;
   lockUntil?: Date;
@@ -36,6 +37,7 @@ const UserSchema: Schema = new Schema({
   otpAttempts: { type: Number, default: 0 },
   lastOtpSentAt: { type: Date },
   refreshToken: { type: String },
+  fcmToken: { type: String },
   tokenVersion: { type: Number, default: 0 },
   failedLoginAttempts: { type: Number, default: 0 },
   lockUntil: { type: Date },

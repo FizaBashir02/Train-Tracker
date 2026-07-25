@@ -188,7 +188,21 @@ class TokenManager(private val context: android.content.Context) {
 // --- ApiClient Builder ---
 
 object ApiClient {
-    private val BASE_URL = com.example.BuildConfig.API_URL.takeIf { it.isNotEmpty() } ?: "https://pakistan-railways-companion-api.example.com/api/"
+    private val BASE_URL: String = run {
+        val raw = com.example.BuildConfig.API_URL.takeIf { !it.isNullOrBlank() }
+            ?: "https://train-tracker-production-b6d0.up.railway.app/api/"
+        var url = raw.trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "https://$url"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
+        if (!url.endsWith("api/")) {
+            url = "${url}api/"
+        }
+        url
+    }
     private var tokenManager: TokenManager? = null
 
     fun initialize(context: android.content.Context) {

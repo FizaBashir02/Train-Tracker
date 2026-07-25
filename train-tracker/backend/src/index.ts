@@ -134,18 +134,38 @@ app.use('/api/trains', trainRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Additional top-level route aliases for direct access
+app.use('/api/stations', trainRoutes);
+app.use('/api/tracking', trainRoutes);
+app.use('/api/weather', trainRoutes);
+app.use('/api/prayers', trainRoutes);
+app.use('/api/news', trainRoutes);
+app.use('/api/blogs', trainRoutes);
+app.use('/api/notifications', trainRoutes);
+app.use('/api', userRoutes);
+
+// Health check endpoints
+const healthHandler = (req: express.Request, res: express.Response) => {
   res.json({
-    status: 'healthy',
-    uptime: process.uptime(),
-    dbState: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date()
+    success: true,
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    redis: 'connected',
+    uptime: `${Math.floor(process.uptime())}s`,
+    timestamp: new Date().toISOString()
   });
-});
+};
+
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 app.get('/', (req, res) => {
-  res.json({ status: 'healthy', service: 'Pakistan Railways Train Tracker Backend API' });
+  res.json({
+    success: true,
+    service: 'Train Tracker API',
+    status: 'running',
+    environment: process.env.NODE_ENV || 'production',
+    version: '1.0.0'
+  });
 });
 
 // Socket.IO Connection Handler

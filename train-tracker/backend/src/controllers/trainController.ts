@@ -6,6 +6,7 @@ import WeatherCache from '../models/WeatherCache';
 import PrayerCache from '../models/PrayerCache';
 import News from '../models/News';
 import Blog from '../models/Blog';
+import Notification from '../models/Notification';
 
 // Helper to escape special regex characters to prevent ReDoS / Regex Injection
 const escapeRegex = (str: string) => {
@@ -340,5 +341,14 @@ export const getBlogs = async (req: Request, res: Response) => {
     return res.status(200).json(blogs);
   } catch (error: any) {
     return res.status(500).json({ success: false, message: 'Server error retrieving blogs' });
+  }
+};
+
+export const getNotifications = async (req: Request, res: Response) => {
+  try {
+    const notifications = await Notification.find().sort({ createdAt: -1 }).limit(50);
+    return res.status(200).json(notifications);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: 'Server error retrieving notifications' });
   }
 };

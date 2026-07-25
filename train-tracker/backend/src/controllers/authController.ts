@@ -178,11 +178,37 @@ export const verifyOtp = async (req: Request, res: Response) => {
     user.otpCode = undefined;
     user.otpExpiry = undefined;
     user.otpAttempts = 0;
+
+    const { secret, refreshSecret } = getJwtSecrets();
+
+    const accessToken = jwt.sign(
+      { id: user._id, email: user.email, role: user.role, tokenVersion: user.tokenVersion },
+      secret,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user._id, tokenVersion: user.tokenVersion },
+      refreshSecret,
+      { expiresIn: '7d' }
+    );
+
+    user.refreshToken = refreshToken;
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message: 'Email address verified successfully. You can now log in.'
+      message: 'Email address verified successfully.',
+      token: accessToken,
+      accessToken,
+      refreshToken,
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role
+      }
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: 'Server error during verification' });
@@ -252,6 +278,7 @@ export const login = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
+      token: accessToken,
       accessToken,
       refreshToken,
       user: {
@@ -300,6 +327,7 @@ export const refreshSessionToken = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
+      token: newAccessToken,
       accessToken: newAccessToken,
       refreshToken: newRefreshToken
     });
@@ -450,6 +478,9 @@ export const registerFcmToken = async (req: AuthenticatedRequest, res: Response)
     const { fcmToken } = req.body;
     if (!fcmToken || typeof fcmToken !== 'string') {
       return res.status(400).json({ success: false, message: 'Valid FCM token required' });
+    }
+    if (req.user) {
+      await User.findByIdAndUpdate(req.user.id, { fcmToken });
     }
     return res.status(200).json({
       success: true,
