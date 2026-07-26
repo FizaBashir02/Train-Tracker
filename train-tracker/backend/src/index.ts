@@ -45,15 +45,40 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error(`Unhandled Rejection: ${reason}`);
 });
 
-process.on('SIGINT', () => {
-  console.log('[PROCESS] SIGINT signal received. Server will remain active.');
-  logger.info('[PROCESS] SIGINT signal handled; server remaining active.');
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-process.on('SIGTERM', () => {
-  console.log('[PROCESS] SIGTERM signal received. Server will remain active.');
-  logger.info('[PROCESS] SIGTERM signal handled; server remaining active.');
-});
+const gracefulShutdown = async (signal: string) => {
+  logger.info(`[PROCESS] ${signal} signal received. Starting graceful shutdown...`);
+  console.log(`[PROCESS] ${signal} signal received. Starting graceful shutdown...`);
+
+  server.close(async () => {
+    logger.info('[PROCESS] HTTP server closed.');
+    try {
+      if (mongoose.connection.readyState !== 0) {
+        await mongoose.disconnect();
+        logger.info('[PROCESS] Mongoose connection closed.');
+      }
+      if (redisClient && redisStatus === 'connected') {
+        if (typeof redisClient.quit === 'function') {
+          await redisClient.quit().catch(() => {});
+        } else if (typeof redisClient.disconnect === 'function') {
+          await redisClient.disconnect().catch(() => {});
+        }
+        logger.info('[PROCESS] Redis connection closed.');
+      }
+    } catch (err: any) {
+      logger.error(`[PROCESS] Error during graceful shutdown: ${err?.message || err}`);
+    } finally {
+      process.exit(0);
+    }
+  });
+
+  setTimeout(() => {
+    logger.error('[PROCESS] Forcefully shutting down server due to timeout.');
+    process.exit(1);
+  }, 10000);
+};
 
 // CORS Configuration with origin whitelisting support
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
@@ -403,7 +428,7 @@ async function initFirebase() {
 
 // Health check endpoints
 const healthHandler = (req: express.Request, res: express.Response) => {
-  res.json({
+  res.status(200).json({
     success: true,
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     redis: redisStatus,
@@ -419,7 +444,7 @@ app.get('/live', (req, res) => res.status(200).json({ status: 'alive' }));
 app.get('/ready', healthHandler);
 
 app.get('/', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     service: 'Train Tracker API',
     status: 'running',
