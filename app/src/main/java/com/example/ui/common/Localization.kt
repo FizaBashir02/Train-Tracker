@@ -71,7 +71,20 @@ object Localization {
             "empty_fav" to "No favorites added yet",
             "empty_searches" to "No search history",
             "clear_history" to "Clear History",
-            "loading" to "Connecting to Railway Servers..."
+            "loading" to "Connecting to Railway Servers...",
+            "home" to "Home",
+            "notifications" to "Notifications",
+            "emergency_helpline" to "Emergency Helplines",
+            "app_customization" to "App Customizations",
+            "about_legals" to "About & Legals",
+            "version" to "Version",
+            "copyright" to "Pakistan Railways IT Dept. © 2026",
+            "select_route" to "Find Trains & Schedules",
+            "recent_search_title" to "Recent Searches",
+            "quick_services" to "Quick Services",
+            "retry" to "Retry",
+            "error_occurred" to "An error occurred",
+            "no_internet" to "No Internet Connection"
         ),
         "ur" to mapOf(
             "app_name" to "ٹرین ٹریکر",
@@ -142,7 +155,20 @@ object Localization {
             "empty_fav" to "ابھی تک کوئی پسندیدہ شامل نہیں کیا گیا",
             "empty_searches" to "کوئی تلاش کی تاریخ نہیں ہے",
             "clear_history" to "ہسٹری صاف کریں",
-            "loading" to "ریلوے سرورز سے منسلک ہو رہا ہے..."
+            "loading" to "ریلوے سرورز سے منسلک ہو رہا ہے...",
+            "home" to "ہوم",
+            "notifications" to "اطلاعات",
+            "emergency_helpline" to "ہنگامی ہیلپ لائنز",
+            "app_customization" to "ایپ کی ترتیبات",
+            "about_legals" to "معلومات و قانونی ضوابط",
+            "version" to "ورژن",
+            "copyright" to "پاکستان ریلوے آئی ٹی شعبہ © 2026",
+            "select_route" to "ٹرینیں اور شیڈول تلاش کریں",
+            "recent_search_title" to "حالیہ تلاشیں",
+            "quick_services" to "فوری خدمات",
+            "retry" to "دوبارہ کوشش کریں",
+            "error_occurred" to "ایک غلطی پیش آگئی",
+            "no_internet" to "انٹرنیٹ کنکشن موجود نہیں ہے"
         )
     )
 

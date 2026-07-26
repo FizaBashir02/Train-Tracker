@@ -39,12 +39,23 @@ sealed class Screen {
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     val repository = AppRepository(application)
+    private val prefs = application.getSharedPreferences("app_settings_prefs", android.content.Context.MODE_PRIVATE)
 
     // --- Localization ---
-    var currentLanguage by mutableStateOf("en") // "en" or "ur"
+    var currentLanguage by mutableStateOf(prefs.getString("language", "en") ?: "en")
+
+    fun updateLanguage(lang: String) {
+        currentLanguage = lang
+        prefs.edit().putString("language", lang).apply()
+    }
 
     // --- Dark Mode ---
-    var isDarkMode by mutableStateOf(false)
+    var isDarkMode by mutableStateOf(prefs.getBoolean("is_dark_mode", false))
+
+    fun updateDarkMode(dark: Boolean) {
+        isDarkMode = dark
+        prefs.edit().putBoolean("is_dark_mode", dark).apply()
+    }
 
     // --- Navigation backstack simulation ---
     private val screenStack = mutableListOf<Screen>(Screen.Splash)

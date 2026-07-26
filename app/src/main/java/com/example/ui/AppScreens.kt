@@ -26,7 +26,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -62,53 +64,69 @@ import kotlinx.coroutines.launch
 fun MainAppContainer(viewModel: AppViewModel) {
     val darkTheme = viewModel.isDarkMode
     val context = LocalContext.current
+    val layoutDirection = if (viewModel.currentLanguage == "ur") LayoutDirection.Rtl else LayoutDirection.Ltr
 
     BackHandler(enabled = viewModel.canGoBack) {
         viewModel.goBack()
     }
 
-    MaterialTheme(
-        colorScheme = if (darkTheme) {
-            darkColorScheme(
-                primary = Color(0xFF2E9E5B),
-                secondary = Color(0xFF8BC34A),
-                background = Color(0xFF111411),
-                surface = Color(0xFF1E221F)
-            )
-        } else {
-            lightColorScheme(
-                primary = Color(0xFF0F7A3E),
-                secondary = Color(0xFF2E9E5B),
-                background = Color(0xFFF3F6F4),
-                surface = Color(0xFFFFFFFF),
-                onPrimary = Color.White
-            )
-        }
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) {
+                darkColorScheme(
+                    primary = Color(0xFF2E9E5B),
+                    secondary = Color(0xFF8BC34A),
+                    tertiary = Color(0xFFA2F7B5),
+                    background = Color(0xFF111411),
+                    surface = Color(0xFF1E221F),
+                    onPrimary = Color.Black,
+                    onSecondary = Color.Black,
+                    onBackground = Color(0xFFE2E3DE),
+                    onSurface = Color(0xFFE2E3DE),
+                    surfaceVariant = Color(0xFF282D29),
+                    onSurfaceVariant = Color(0xFFC2C8C3)
+                )
+            } else {
+                lightColorScheme(
+                    primary = Color(0xFF0F7A3E),
+                    secondary = Color(0xFF2E9E5B),
+                    tertiary = Color(0xFF8BC34A),
+                    background = Color(0xFFF3F6F4),
+                    surface = Color(0xFFFFFFFF),
+                    onPrimary = Color.White,
+                    onSecondary = Color.White,
+                    onBackground = Color(0xFF1A1C19),
+                    onSurface = Color(0xFF1A1C19),
+                    surfaceVariant = Color(0xFFE0E5E0),
+                    onSurfaceVariant = Color(0xFF424943)
+                )
+            }
         ) {
-            Crossfade(targetState = viewModel.currentScreen, label = "ScreenTransition") { screen ->
-                when (screen) {
-                    Screen.Splash -> SplashScreen(viewModel)
-                    Screen.Onboarding -> OnboardingScreen(viewModel)
-                    Screen.Login -> LoginScreen(viewModel)
-                    Screen.SignUp -> SignUpScreen(viewModel)
-                    Screen.Verification -> VerificationScreen(viewModel)
-                    Screen.Home -> HomeDashboardScreen(viewModel)
-                    Screen.TrainSearch -> TrainSearchScreen(viewModel)
-                    Screen.LiveStatus -> LiveStatusScreen(viewModel)
-                    Screen.TrainScheduleScreen -> TrainScheduleScreen(viewModel)
-                    Screen.StationInfoScreen -> StationInfoScreen(viewModel)
-                    Screen.FreightTrainsScreen -> FreightTrainsScreen(viewModel)
-                    Screen.NewsBlogsScreen -> NewsBlogsScreen(viewModel)
-                    Screen.NamazTimingsScreen -> NamazTimingsScreen(viewModel)
-                    Screen.NotificationsScreen -> NotificationsScreen(viewModel)
-                    Screen.FavoritesScreen -> FavoritesScreen(viewModel)
-                    Screen.ProfileScreen -> ProfileScreen(viewModel)
-                    Screen.SettingsScreen -> SettingsScreen(viewModel)
-                    Screen.HelplineScreen -> HelplineScreen(viewModel)
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Crossfade(targetState = viewModel.currentScreen, label = "ScreenTransition") { screen ->
+                    when (screen) {
+                        Screen.Splash -> SplashScreen(viewModel)
+                        Screen.Onboarding -> OnboardingScreen(viewModel)
+                        Screen.Login -> LoginScreen(viewModel)
+                        Screen.SignUp -> SignUpScreen(viewModel)
+                        Screen.Verification -> VerificationScreen(viewModel)
+                        Screen.Home -> HomeDashboardScreen(viewModel)
+                        Screen.TrainSearch -> TrainSearchScreen(viewModel)
+                        Screen.LiveStatus -> LiveStatusScreen(viewModel)
+                        Screen.TrainScheduleScreen -> TrainScheduleScreen(viewModel)
+                        Screen.StationInfoScreen -> StationInfoScreen(viewModel)
+                        Screen.FreightTrainsScreen -> FreightTrainsScreen(viewModel)
+                        Screen.NewsBlogsScreen -> NewsBlogsScreen(viewModel)
+                        Screen.NamazTimingsScreen -> NamazTimingsScreen(viewModel)
+                        Screen.NotificationsScreen -> NotificationsScreen(viewModel)
+                        Screen.FavoritesScreen -> FavoritesScreen(viewModel)
+                        Screen.ProfileScreen -> ProfileScreen(viewModel)
+                        Screen.SettingsScreen -> SettingsScreen(viewModel)
+                        Screen.HelplineScreen -> HelplineScreen(viewModel)
+                    }
                 }
             }
         }
@@ -1055,12 +1073,12 @@ fun QuickServiceItem(
     ) {
         Card(
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = backgroundColor),
-            border = borderStroke,
+            colors = CardDefaults.cardColors(containerColor = if (backgroundColor == Color.White) MaterialTheme.colorScheme.surface else backgroundColor),
+            border = borderStroke ?: BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),
-            elevation = CardDefaults.cardElevation(if (backgroundColor == Color.White) 1.dp else 0.dp)
+            elevation = CardDefaults.cardElevation(1.dp)
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -1079,7 +1097,7 @@ fun QuickServiceItem(
             text = label.uppercase(),
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF334155), // Slate 700
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1098,7 +1116,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
         modifier = Modifier
             .fillMaxHeight()
             .width(300.dp)
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         // 1. Dark Green Header Area with logo and user details
         Box(
@@ -1295,7 +1313,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        viewModel.currentLanguage = if (viewModel.currentLanguage == "en") "ur" else "en"
+                        viewModel.updateLanguage(if (viewModel.currentLanguage == "en") "ur" else "en")
                     }
                     .padding(vertical = 12.dp, horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1305,20 +1323,20 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                     Icon(
                         imageVector = Icons.Default.Translate,
                         contentDescription = null,
-                        tint = Color(0xFF64748B),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "Language",
-                        color = Color(0xFF1E293B),
+                        text = Localization.getText("language", lang),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
                 }
                 Text(
                     text = if (viewModel.currentLanguage == "en") "English >" else "اردو >",
-                    color = Color(0xFF0F7A3E),
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
@@ -1336,21 +1354,21 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                     Icon(
                         imageVector = Icons.Default.DarkMode,
                         contentDescription = null,
-                        tint = Color(0xFF64748B),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "Dark Mode",
-                        color = Color(0xFF1E293B),
+                        text = Localization.getText("dark_mode", lang),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
                 }
                 Switch(
                     checked = viewModel.isDarkMode,
-                    onCheckedChange = { viewModel.isDarkMode = it },
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF0F7A3E))
+                    onCheckedChange = { viewModel.updateDarkMode(it) },
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                 )
             }
 
@@ -1450,13 +1468,13 @@ fun DrawerItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF64748B),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = title,
-                color = Color(0xFF1E293B),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp
             )
@@ -1494,7 +1512,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color.White,
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
                 modifier = Modifier.width(300.dp)
             ) {
@@ -1508,11 +1526,11 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     title = {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "Train Tracker",
-                                color = Color.White,
+                                text = Localization.getText("app_name", lang),
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp,
-                                modifier = Modifier.padding(end = 12.dp) // Offset slightly because of hamburger icon
+                                modifier = Modifier.padding(end = 12.dp)
                             )
                         }
                     },
@@ -1521,7 +1539,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
                                 contentDescription = "Menu",
-                                tint = Color.White
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     },
@@ -1531,7 +1549,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "Alerts",
-                                    tint = Color.White
+                                    tint = MaterialTheme.colorScheme.onPrimary
                                 )
                                 Box(
                                     modifier = Modifier
@@ -1552,23 +1570,22 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFF0F7A3E)
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 )
             },
             bottomBar = {
                 NavigationBar(
-                    containerColor = Color.White,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier.border(1.dp, Color(0xFFE2E8F0)) // subtle slate-200 border-t
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp
                 ) {
                     NavigationBarItem(
                         selected = true,
                         onClick = { },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Home", tint = Color(0xFF0F7A3E)) },
-                        label = { Text("Home", color = Color(0xFF0F7A3E), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Home", tint = MaterialTheme.colorScheme.primary) },
+                        label = { Text(Localization.getText("home", lang), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color(0xFFE8F3ED)
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                         )
                     )
                     NavigationBarItem(
@@ -1577,8 +1594,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             viewModel.fetchLiveStatus("7UP")
                             viewModel.navigateTo(Screen.LiveStatus) 
                         },
-                        icon = { Icon(Icons.Default.DirectionsRailway, contentDescription = "Live Train", tint = Color(0xFF94A3B8)) },
-                        label = { Text("Live Train", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.DirectionsRailway, contentDescription = "Live Train", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        label = { Text(Localization.getText("live_status", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = Color.Transparent
                         )
@@ -1586,8 +1603,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     NavigationBarItem(
                         selected = false,
                         onClick = { viewModel.navigateTo(Screen.TrainSearch) },
-                        icon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFF94A3B8)) },
-                        label = { Text("Search", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        label = { Text(Localization.getText("search", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = Color.Transparent
                         )
@@ -1595,8 +1612,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     NavigationBarItem(
                         selected = false,
                         onClick = { viewModel.navigateTo(Screen.FavoritesScreen) },
-                        icon = { Icon(Icons.Default.Favorite, contentDescription = "Favorites", tint = Color(0xFF94A3B8)) },
-                        label = { Text("Favorites", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Favorite, contentDescription = "Favorites", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        label = { Text(Localization.getText("favorites", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = Color.Transparent
                         )
@@ -1604,8 +1621,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     NavigationBarItem(
                         selected = false,
                         onClick = { viewModel.navigateTo(Screen.ProfileScreen) },
-                        icon = { Icon(Icons.Default.Person, contentDescription = "Profile", tint = Color(0xFF94A3B8)) },
-                        label = { Text("Profile", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Person, contentDescription = "Profile", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        label = { Text(Localization.getText("profile", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             indicatorColor = Color.Transparent
                         )
@@ -1617,7 +1634,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .background(Color(0xFFF8FAFC)) // High-contrast super clean slate-50 background
+                    .background(MaterialTheme.colorScheme.background)
                     .pointerInput(Unit) {
                         detectTapGestures(onTap = {
                             focusManager.clearFocus()
@@ -1625,7 +1642,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         })
                     }
             ) {
-                // 1. Welcome Greeting row & Search bar matching Screen 2 exactly
+                // 1. Welcome Greeting row & Search bar
                 item {
                     Column {
                         Row(
@@ -1637,31 +1654,31 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         ) {
                             Column {
                                 Text(
-                                    text = "Good Morning! 👋",
+                                    text = if (lang == "ur") "خوش آمدید! 👋" else "Good Morning! 👋",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A) // Slate 900
+                                    color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Welcome back",
+                                    text = Localization.getText("app_name", lang),
                                     fontSize = 12.sp,
-                                    color = Color(0xFF64748B) // Slate 500
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        // Premium Single Search Bar matching Screen 2 exactly
+                        // Single Search Bar
                         var dashboardSearchQuery by remember { mutableStateOf("") }
                         OutlinedTextField(
                             value = dashboardSearchQuery,
                             onValueChange = { dashboardSearchQuery = it },
-                            placeholder = { Text("Search Train, Number or Station", color = Color(0xFF94A3B8), fontSize = 14.sp) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF94A3B8)) },
+                            placeholder = { Text(Localization.getText("search_train", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Tune,
                                     contentDescription = "Filter",
-                                    tint = Color(0xFF0F7A3E),
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
                                         .size(24.dp)
                                         .clickable {
@@ -1677,10 +1694,10 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 .padding(bottom = 16.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = Color(0xFF0F7A3E),
-                                unfocusedBorderColor = Color(0xFFE2E8F0)
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
                             ),
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -1835,15 +1852,15 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                         shape = RoundedCornerShape(18.dp),
                         elevation = CardDefaults.cardElevation(2.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)) // Slate-200 border
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
                             Text(
                                 text = "SEARCH TRAIN ROUTE",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 letterSpacing = 0.5.sp
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -1852,7 +1869,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 value = viewModel.searchSource,
                                 onValueChange = { viewModel.searchSource = it },
                                 label = { Text(text = Localization.getText("source", lang)) },
-                                leadingIcon = { Icon(Icons.Default.TripOrigin, contentDescription = null, tint = Color(0xFF0F7A3E)) },
+                                leadingIcon = { Icon(Icons.Default.TripOrigin, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
@@ -1867,7 +1884,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 value = viewModel.searchDest,
                                 onValueChange = { viewModel.searchDest = it },
                                 label = { Text(text = Localization.getText("destination", lang)) },
-                                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF0F7A3E)) },
+                                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
@@ -1896,7 +1913,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F7A3E)),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(imageVector = Icons.Default.Search, contentDescription = null)
@@ -1907,7 +1924,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     }
                 }
 
-            // 4. Tracked Train Card (Left accent strip, timeline view, ETA updates)
+            // 4. Tracked Train Card
             item {
                 val activeStatus = viewModel.activeLiveStatus
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
@@ -1915,7 +1932,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         text = "LIVE TRACKING PROFILE",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF64748B),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 1.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -1934,9 +1951,9 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(2.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                             // Left border green accent strip
@@ -1944,7 +1961,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 modifier = Modifier
                                     .width(4.dp)
                                     .fillMaxHeight()
-                                    .background(Color(0xFF0F7A3E))
+                                    .background(MaterialTheme.colorScheme.primary)
                             )
                             
                             Column(modifier = Modifier.padding(16.dp)) {
@@ -1958,14 +1975,14 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                             text = "TRACKED TRAIN",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.ExtraBold,
-                                            color = Color(0xFF94A3B8), // Slate 400
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             letterSpacing = 0.5.sp
                                         )
                                         Text(
                                             text = "$sName ($sNum)",
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                     
@@ -1973,14 +1990,14 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(if (isLate) Color(0xFFFEE2E2) else Color(0xFFE8F3ED))
+                                            .background(if (isLate) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer)
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
                                         Text(
                                             text = if (isLate) "${sDelay} MIN LATE" else "ON TIME",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isLate) Color(0xFFDC2626) else Color(0xFF0F7A3E)
+                                            color = if (isLate) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                                         )
                                     }
                                 }
@@ -1997,12 +2014,12 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                             text = if (sPrev.contains(" ")) sPrev.split(" ").map { it.take(1) }.joinToString("").uppercase() else sPrev.take(3).uppercase(),
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = sPrev,
                                             fontSize = 9.sp,
-                                            color = Color(0xFF64748B),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -3667,7 +3684,7 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 .padding(24.dp)
         ) {
             // Language Selection
-            Text("App Customizations", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(Localization.getText("app_customization", lang), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
@@ -3679,13 +3696,13 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 Row {
                     FilterChip(
                         selected = lang == "en",
-                        onClick = { viewModel.currentLanguage = "en" },
+                        onClick = { viewModel.updateLanguage("en") },
                         label = { Text("English") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = lang == "ur",
-                        onClick = { viewModel.currentLanguage = "ur" },
+                        onClick = { viewModel.updateLanguage("ur") },
                         label = { Text("اردو") }
                     )
                 }
@@ -3701,20 +3718,20 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 Text(Localization.getText("dark_mode", lang), fontWeight = FontWeight.Bold)
                 Switch(
                     checked = viewModel.isDarkMode,
-                    onCheckedChange = { viewModel.isDarkMode = it }
+                    onCheckedChange = { viewModel.updateDarkMode(it) }
                 )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Text("About & Legals", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(Localization.getText("about_legals", lang), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text("Train Tracker app is optimized for premium Pakistan Railways tracking. Fully secure and JWT standard compatible encryption.", fontSize = 13.sp)
+            Text("Train Tracker app is optimized for premium Pakistan Railways tracking. Fully secure and JWT standard compatible encryption.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Version 2.0.4", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text("Pakistan Railways IT Dept. © 2026", fontSize = 12.sp, color = Color.Gray)
+            Text("${Localization.getText("version", lang)} 2.0.4", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(Localization.getText("copyright", lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
