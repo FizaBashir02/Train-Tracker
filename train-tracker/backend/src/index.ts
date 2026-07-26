@@ -172,6 +172,9 @@ app.get(['/health', '/api/health', '/live', '/ready'], (req: express.Request, re
   });
 });
 
+// Trust proxy for rate limiting behind reverse proxies (Railway)
+app.set("trust proxy", 1);
+
 // Rate Limiter configuration
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

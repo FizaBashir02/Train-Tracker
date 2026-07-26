@@ -89,7 +89,7 @@ class AppRepository(context: Context) {
 
     suspend fun login(identifier: String, passwordHash: String): Boolean {
         try {
-            val response = ApiClient.apiService.login(AuthRequest(identifier, "", passwordHash))
+            val response = ApiClient.apiService.login(LoginRequest(identifier, passwordHash))
             ApiClient.getTokenManager()?.let { tm ->
                 tm.saveToken(response.token)
                 tm.saveRefreshToken(response.refreshToken)

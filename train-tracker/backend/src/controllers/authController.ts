@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { validationResult } from 'express-validator';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
@@ -11,6 +12,18 @@ const getJwtSecrets = () => {
   const secret = process.env.JWT_SECRET || 'fallback_jwt_secret_key_railway_production_2026';
   const refreshSecret = process.env.JWT_REFRESH_SECRET || 'fallback_jwt_refresh_secret_key_railway_production_2026';
   return { secret, refreshSecret };
+};
+
+// Helper function to safely redact sensitive data from request body logging
+const getSafeBody = (body: any) => {
+  if (!body || typeof body !== 'object') return body;
+  const safe = { ...body };
+  for (const key of Object.keys(safe)) {
+    if (/password/i.test(key) || /secret/i.test(key) || /token/i.test(key)) {
+      safe[key] = '[REDACTED]';
+    }
+  }
+  return safe;
 };
 
 // Password strength validation helper
@@ -63,7 +76,7 @@ const sendEmail = async (
   text: string, 
   html?: string,
   maxRetries = 3
-): Promise<{ success: boolean; message?: string }> => {
+): Promise<{ success: boolean; message?: string; error?: any }> => {
   if (!isSmtpConfigured()) {
     console.warn(`[SMTP-WARNING] SMTP credentials are not configured in environment variables. Email to ${to} skipped.`);
     return { success: false, message: 'SMTP credentials are not configured in environment.' };
@@ -87,33 +100,67 @@ const sendEmail = async (
       return { success: true };
     } catch (error: any) {
       lastError = error;
-      console.error(`[SMTP-ERROR] Attempt ${attempt}/${maxRetries} failed for email to ${to}: ${error?.message || error}`);
+      console.error(`[SMTP-ERROR] Attempt ${attempt}/${maxRetries} failed for email to ${to}: ${error?.code || ''} ${error?.message || error}`, error);
       if (attempt < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   }
 
-  return { success: false, message: lastError?.message || 'Failed to send email after multiple retries' };
+  return { success: false, message: lastError?.message || 'Failed to send email after multiple retries', error: lastError };
 };
 
 export const signUp = async (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, phone, passwordHash } = req.body;
+    console.log('[AUTH] signUp request body:', getSafeBody(req.body));
 
-    if (!firstName || !lastName || !email || !phone || !passwordHash) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'All fields (firstName, lastName, email, phone, passwordHash) are required' 
+    const valErrors = validationResult(req);
+    if (!valErrors.isEmpty()) {
+      console.error('[VALIDATION-ERROR] signUp validation errors:', JSON.stringify(valErrors.array()));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: valErrors.array(),
+        fieldErrors: valErrors.mapped()
+      });
+    }
+
+    const firstName = req.body.firstName || req.body.first_name;
+    const lastName = req.body.lastName || req.body.last_name;
+    const email = req.body.email;
+    const phone = req.body.phone || req.body.phoneNumber || req.body.phone_number;
+    const rawPassword = req.body.password || req.body.passwordHash;
+
+    const fieldErrors: Record<string, string> = {};
+    if (!firstName) fieldErrors.firstName = 'First name is required';
+    if (!lastName) fieldErrors.lastName = 'Last name is required';
+    if (!email) fieldErrors.email = 'Email address is required';
+    if (!phone) fieldErrors.phone = 'Phone number is required';
+    if (!rawPassword) fieldErrors.password = 'Password is required';
+
+    if (Object.keys(fieldErrors).length > 0) {
+      console.error('[VALIDATION-ERROR] signUp missing required fields:', fieldErrors);
+      return res.status(400).json({
+        success: false,
+        message: 'All fields (firstName, lastName, email, phone, password) are required',
+        errors: fieldErrors,
+        fieldErrors
       });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
 
-    const pwdCheck = isStrongPassword(passwordHash);
+    const pwdCheck = isStrongPassword(rawPassword);
     if (!pwdCheck.valid) {
-      return res.status(400).json({ success: false, message: pwdCheck.reason });
+      console.error('[VALIDATION-ERROR] signUp weak password:', pwdCheck.reason);
+      const errors = { password: pwdCheck.reason || 'Password does not meet security requirements' };
+      return res.status(400).json({
+        success: false,
+        message: pwdCheck.reason,
+        errors,
+        fieldErrors: errors
+      });
     }
 
     const existingUser = await User.findOne({ 
@@ -124,12 +171,20 @@ export const signUp = async (req: Request, res: Response) => {
     });
 
     if (existingUser) {
+      const field = existingUser.email === cleanEmail ? 'email' : 'phone';
       const matchReason = existingUser.email === cleanEmail ? 'Email already registered' : 'Phone number already registered';
-      return res.status(400).json({ success: false, message: matchReason });
+      console.error('[VALIDATION-ERROR] signUp duplicate user:', matchReason);
+      const errors = { [field]: matchReason };
+      return res.status(400).json({
+        success: false,
+        message: matchReason,
+        errors,
+        fieldErrors: errors
+      });
     }
 
     const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(passwordHash, salt);
+    const hashedPassword = await bcrypt.hash(rawPassword, salt);
 
     // Cryptographically secure numeric OTP code
     const otpBuffer = crypto.randomBytes(2);
@@ -156,14 +211,26 @@ export const signUp = async (req: Request, res: Response) => {
     await newUser.save();
 
     const mailText = `Welcome to Pakistan Railways Companion app! Use code ${otpCode} to verify your email address. Valid for 15 minutes.`;
-    await sendEmail(cleanEmail, "Verify Your Email Address", mailText);
+    
+    try {
+      const emailResult = await sendEmail(cleanEmail, "Verify Your Email Address", mailText);
+      if (!emailResult.success) {
+        console.error(`[SMTP-ERROR] signUp verification email failed for ${cleanEmail}:`, emailResult.message || emailResult.error);
+      }
+    } catch (smtpErr: any) {
+      console.error(`[SMTP-ERROR] Exception sending verification email to ${cleanEmail}:`, smtpErr?.message || smtpErr, smtpErr);
+    }
 
-    await Notification.create({
-      title: "Welcome aboard!",
-      message: `Your companion account has been pre-registered. Use code ${otpCode} to verify your email.`,
-      category: "broadcast",
-      recipientEmail: cleanEmail
-    });
+    try {
+      await Notification.create({
+        title: "Welcome aboard!",
+        message: `Your companion account has been pre-registered. Use code ${otpCode} to verify your email.`,
+        category: "broadcast",
+        recipientEmail: cleanEmail
+      });
+    } catch (notifErr: any) {
+      console.warn(`[NOTIF-WARN] Failed to create welcome notification for ${cleanEmail}:`, notifErr?.message || notifErr);
+    }
 
     return res.status(201).json({
       success: true,
@@ -171,7 +238,8 @@ export const signUp = async (req: Request, res: Response) => {
       email: cleanEmail
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error during registration' });
+    console.error('[AUTH-ERROR] Exception in signUp:', error?.message || error, error?.stack);
+    return res.status(500).json({ success: false, message: 'Server error during registration', error: error?.message || String(error) });
   }
 };
 
@@ -247,9 +315,34 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { identifier, passwordHash } = req.body;
-    if (!identifier || !passwordHash) {
-      return res.status(400).json({ success: false, message: 'Identifier (Email/Phone) and password are required' });
+    console.log('[AUTH] login request body:', getSafeBody(req.body));
+
+    const valErrors = validationResult(req);
+    if (!valErrors.isEmpty()) {
+      console.error('[VALIDATION-ERROR] login validation errors:', JSON.stringify(valErrors.array()));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: valErrors.array(),
+        fieldErrors: valErrors.mapped()
+      });
+    }
+
+    const identifier = req.body.identifier || req.body.email || req.body.phone || req.body.username;
+    const rawPassword = req.body.password || req.body.passwordHash;
+
+    const fieldErrors: Record<string, string> = {};
+    if (!identifier) fieldErrors.identifier = 'Identifier (Email/Phone) is required';
+    if (!rawPassword) fieldErrors.password = 'Password is required';
+
+    if (Object.keys(fieldErrors).length > 0) {
+      console.error('[VALIDATION-ERROR] login missing required fields:', fieldErrors);
+      return res.status(400).json({
+        success: false,
+        message: 'Identifier (Email/Phone) and password are required',
+        errors: fieldErrors,
+        fieldErrors
+      });
     }
 
     const cleanIdentifier = identifier.trim().toLowerCase();
@@ -261,6 +354,7 @@ export const login = async (req: Request, res: Response) => {
     });
 
     if (!user) {
+      console.error('[AUTH-WARNING] login user not found:', cleanIdentifier);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
@@ -270,7 +364,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(423).json({ success: false, message: `Account is temporarily locked. Try again in ${remainingMins} minutes.` });
     }
 
-    const isMatch = await bcrypt.compare(passwordHash, user.passwordHash);
+    const isMatch = await bcrypt.compare(rawPassword, user.passwordHash);
     if (!isMatch) {
       user.failedLoginAttempts += 1;
       if (user.failedLoginAttempts >= 5) {
@@ -278,10 +372,12 @@ export const login = async (req: Request, res: Response) => {
         user.failedLoginAttempts = 0;
       }
       await user.save();
+      console.error('[AUTH-WARNING] login password mismatch for user:', cleanIdentifier);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     if (!user.isEmailVerified) {
+      console.warn('[AUTH-WARNING] login email unverified for user:', cleanIdentifier);
       return res.status(403).json({ success: false, message: 'Please verify your email address before logging in.' });
     }
 
@@ -320,7 +416,8 @@ export const login = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error during authentication' });
+    console.error('[AUTH-ERROR] Exception in login:', error?.message || error, error?.stack);
+    return res.status(500).json({ success: false, message: 'Server error during authentication', error: error?.message || String(error) });
   }
 };
 
@@ -399,9 +496,29 @@ export const logoutAllDevices = async (req: AuthenticatedRequest, res: Response)
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
+    console.log('[AUTH] forgotPassword request body:', getSafeBody(req.body));
+
+    const valErrors = validationResult(req);
+    if (!valErrors.isEmpty()) {
+      console.error('[VALIDATION-ERROR] forgotPassword validation errors:', JSON.stringify(valErrors.array()));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: valErrors.array(),
+        fieldErrors: valErrors.mapped()
+      });
+    }
+
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ success: false, message: 'Email address is required' });
+      const fieldErrors = { email: 'Email address is required' };
+      console.error('[VALIDATION-ERROR] forgotPassword missing email:', fieldErrors);
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is required',
+        errors: fieldErrors,
+        fieldErrors
+      });
     }
 
     const cleanEmail = email.trim().toLowerCase();
@@ -416,8 +533,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     // Cooldown check: 1 minute between OTP requests
-    if (user.lastOtpSentAt && (Date.now() - user.lastOtpSentAt.getTime()) < 60000) {
-      return res.status(429).json({ success: false, message: 'Please wait before requesting another reset code.' });
+    if (user.lastOtpSentAt) {
+      const lastTime = new Date(user.lastOtpSentAt).getTime();
+      if (!isNaN(lastTime) && (Date.now() - lastTime) < 60000) {
+        return res.status(429).json({ success: false, message: 'Please wait before requesting another reset code.' });
+      }
     }
 
     const otpBuffer = crypto.randomBytes(2);
@@ -429,14 +549,23 @@ export const forgotPassword = async (req: Request, res: Response) => {
     await user.save();
 
     const resetText = `Your companion app password reset code is ${otpCode}. Valid for 15 minutes.`;
-    await sendEmail(cleanEmail, "Reset Your Password", resetText);
+
+    try {
+      const emailResult = await sendEmail(cleanEmail, "Reset Your Password", resetText);
+      if (!emailResult.success) {
+        console.error(`[SMTP-ERROR] forgotPassword email failed to send to ${cleanEmail}:`, emailResult.message || emailResult.error);
+      }
+    } catch (smtpErr: any) {
+      console.error(`[SMTP-ERROR] Exception sending password reset email to ${cleanEmail}:`, smtpErr?.message || smtpErr, smtpErr);
+    }
 
     return res.status(200).json({
       success: true,
       message: 'If a matching account exists, a password reset code has been sent.'
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error processing request' });
+    console.error('[AUTH-ERROR] Exception in forgotPassword:', error?.message || error, error?.stack);
+    return res.status(500).json({ success: false, message: 'Server error processing request', error: error?.message || String(error) });
   }
 };
 

@@ -11,6 +11,11 @@ import java.util.concurrent.TimeUnit
 
 // --- Network Request/Response DTOs ---
 
+data class LoginRequest(
+    val identifier: String,
+    val password: String
+)
+
 data class AuthRequest(
     val email: String,
     val phone: String,
@@ -22,7 +27,7 @@ data class SignUpRequest(
     val lastName: String,
     val email: String,
     val phone: String,
-    val passwordHash: String
+    val password: String
 )
 
 data class OtpRequest(
@@ -91,7 +96,7 @@ data class UploadProfilePictureRequest(
 
 interface ApiService {
     @POST("auth/login")
-    suspend fun login(@Body request: AuthRequest): AuthResponse
+    suspend fun login(@Body request: LoginRequest): AuthResponse
 
     @POST("auth/signup")
     suspend fun signUp(@Body request: SignUpRequest): ApiGenericResponse
