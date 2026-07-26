@@ -60,6 +60,8 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import kotlinx.coroutines.launch
 
+import com.example.ui.theme.MyApplicationTheme
+
 @Composable
 fun MainAppContainer(viewModel: AppViewModel) {
     val darkTheme = viewModel.isDarkMode
@@ -71,37 +73,7 @@ fun MainAppContainer(viewModel: AppViewModel) {
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) {
-                darkColorScheme(
-                    primary = Color(0xFF2E9E5B),
-                    secondary = Color(0xFF8BC34A),
-                    tertiary = Color(0xFFA2F7B5),
-                    background = Color(0xFF111411),
-                    surface = Color(0xFF1E221F),
-                    onPrimary = Color.Black,
-                    onSecondary = Color.Black,
-                    onBackground = Color(0xFFE2E3DE),
-                    onSurface = Color(0xFFE2E3DE),
-                    surfaceVariant = Color(0xFF282D29),
-                    onSurfaceVariant = Color(0xFFC2C8C3)
-                )
-            } else {
-                lightColorScheme(
-                    primary = Color(0xFF0F7A3E),
-                    secondary = Color(0xFF2E9E5B),
-                    tertiary = Color(0xFF8BC34A),
-                    background = Color(0xFFF3F6F4),
-                    surface = Color(0xFFFFFFFF),
-                    onPrimary = Color.White,
-                    onSecondary = Color.White,
-                    onBackground = Color(0xFF1A1C19),
-                    onSurface = Color(0xFF1A1C19),
-                    surfaceVariant = Color(0xFFE0E5E0),
-                    onSurfaceVariant = Color(0xFF424943)
-                )
-            }
-        ) {
+        MyApplicationTheme(darkTheme = darkTheme) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
