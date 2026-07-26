@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.model.*
 import com.example.data.repository.AppRepository
 import com.example.data.service.*
+import com.example.util.validatePassword
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -161,9 +162,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = true
             errorMessage = null
             try {
-                // For security, standard MD5/SHA is simulated by using string hash
-                val hash = passwordRaw.hashCode().toString()
-                val success = repository.login(emailOrPhone, hash)
+                val success = repository.login(emailOrPhone, passwordRaw)
                 isLoading = false
                 if (success) {
                     navigateAndClear(Screen.Home)
@@ -180,15 +179,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun submitSignUp(firstName: String, lastName: String, email: String, phone: String, passwordRaw: String, onResult: (Boolean) -> Unit) {
+        val check = validatePassword(passwordRaw)
+        if (!check.first) {
+            errorMessage = check.second ?: "Invalid password"
+            onResult(false)
+            return
+        }
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             try {
-                val hash = passwordRaw.hashCode().toString()
-                val success = repository.signUp(firstName, lastName, email, phone, hash)
+                val success = repository.signUp(firstName, lastName, email, phone, passwordRaw)
                 isLoading = false
                 if (success) {
-                    tempSignUpData = SignUpData(firstName, lastName, email, phone, hash)
+                    tempSignUpData = SignUpData(firstName, lastName, email, phone, passwordRaw)
                     navigateTo(Screen.Verification)
                     onResult(true)
                 } else {
@@ -225,12 +229,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetPassword(email: String, otpCode: String, newPasswordRaw: String, onResult: (Boolean) -> Unit) {
+        val check = validatePassword(newPasswordRaw)
+        if (!check.first) {
+            errorMessage = check.second ?: "Invalid password"
+            onResult(false)
+            return
+        }
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             try {
-                val hash = newPasswordRaw.hashCode().toString()
-                val success = repository.resetPassword(email, otpCode, hash)
+                val success = repository.resetPassword(email, otpCode, newPasswordRaw)
                 isLoading = false
                 if (success) {
                     onResult(true)
@@ -291,10 +300,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun changePassword(oldRaw: String, newRaw: String, onResult: (Boolean) -> Unit) {
+        val check = validatePassword(newRaw)
+        if (!check.first) {
+            errorMessage = check.second ?: "Invalid password"
+            onResult(false)
+            return
+        }
         viewModelScope.launch {
-            val oldHash = oldRaw.hashCode().toString()
-            val newHash = newRaw.hashCode().toString()
-            val success = repository.changePassword(oldHash, newHash)
+            val success = repository.changePassword(oldRaw, newRaw)
             onResult(success)
         }
     }
