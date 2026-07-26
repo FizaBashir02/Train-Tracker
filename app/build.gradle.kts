@@ -1,11 +1,31 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
+
+val envFileProperties = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+    } else {
+        val envExampleFile = rootProject.file(".env.example")
+        if (envExampleFile.exists()) {
+            envExampleFile.inputStream().use { load(it) }
+        }
+    }
+}
+
+fun getEnvVar(key: String, defaultValue: String = ""): String {
+    val sysEnv = System.getenv(key)
+    if (!sysEnv.isNullOrEmpty()) return sysEnv
+    val fileEnv = envFileProperties.getProperty(key)
+    if (!fileEnv.isNullOrEmpty()) return fileEnv
+    return defaultValue
+}
 
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
-  alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
 }
 
@@ -21,7 +41,28 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    buildConfigField("String", "GEMINI_API_KEY", "\"MY_GEMINI_API_KEY\"")
+
+    val apiUrl = getEnvVar("API_URL", "https://your-production-railway-app-url.railway.app/api/")
+    val googleMapsApiKey = getEnvVar("GOOGLE_MAPS_API_KEY", "")
+    val geminiApiKey = getEnvVar("GEMINI_API_KEY", "MY_GEMINI_API_KEY")
+
+    if (apiUrl.isNotEmpty()) {
+      buildConfigField("String", "API_URL", "\"$apiUrl\"")
+    } else {
+      buildConfigField("String", "API_URL", "\"\"")
+    }
+
+    if (googleMapsApiKey.isNotEmpty()) {
+      buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
+    } else {
+      buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"\"")
+    }
+
+    if (geminiApiKey.isNotEmpty()) {
+      buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+    } else {
+      buildConfigField("String", "GEMINI_API_KEY", "\"\"")
+    }
   }
 
   signingConfigs {
@@ -58,14 +99,6 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
-}
-
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
-  ignoreList.add("FIREBASE_SERVICE_ACCOUNT_JSON")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
