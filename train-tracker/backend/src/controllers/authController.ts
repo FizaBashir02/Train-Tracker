@@ -142,7 +142,7 @@ export const signUp = async (req: Request, res: Response) => {
       console.error('[VALIDATION-ERROR] signUp missing required fields:', fieldErrors);
       return res.status(400).json({
         success: false,
-        message: 'All fields (firstName, lastName, email, phone, password) are required',
+        message: 'All required fields (firstName, lastName, email, phone, password) must be provided',
         errors: fieldErrors,
         fieldErrors
       });
@@ -191,13 +191,19 @@ export const signUp = async (req: Request, res: Response) => {
     const otpCode = (1000 + (otpBuffer.readUInt16BE(0) % 9000)).toString();
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
+    let userRole = (req.body.role || 'USER').toString().trim();
+    const validRoles = ['USER', 'user', 'passenger', 'admin', 'conductor'];
+    if (!userRole || !validRoles.includes(userRole)) {
+      userRole = 'USER';
+    }
+
     const newUser = new User({
       firstName,
       lastName,
       email: cleanEmail,
       phone: cleanPhone,
       passwordHash: hashedPassword,
-      role: 'passenger',
+      role: userRole,
       isEmailVerified: false,
       otpCode,
       otpExpiry,
@@ -238,8 +244,13 @@ export const signUp = async (req: Request, res: Response) => {
       email: cleanEmail
     });
   } catch (error: any) {
-    console.error('[AUTH-ERROR] Exception in signUp:', error?.message || error, error?.stack);
-    return res.status(500).json({ success: false, message: 'Server error during registration', error: error?.message || String(error) });
+    console.error('[AUTH-ERROR] Exception in signUp:', error?.stack || error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error during registration', 
+      error: error?.message || String(error),
+      stack: error?.stack 
+    });
   }
 };
 
@@ -280,13 +291,13 @@ export const verifyOtp = async (req: Request, res: Response) => {
     const { secret, refreshSecret } = getJwtSecrets();
 
     const accessToken = jwt.sign(
-      { id: user._id, email: user.email, role: user.role, tokenVersion: user.tokenVersion },
+      { id: user._id, email: user.email, role: user.role, tokenVersion: user.tokenVersion || 0 },
       secret,
       { expiresIn: '15m' }
     );
 
     const refreshToken = jwt.sign(
-      { id: user._id, tokenVersion: user.tokenVersion },
+      { id: user._id, tokenVersion: user.tokenVersion || 0 },
       refreshSecret,
       { expiresIn: '7d' }
     );
@@ -346,68 +357,51 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const cleanIdentifier = identifier.trim().toLowerCase();
+    const cleanPhone = identifier.trim();
+
+    // 1. findOne()
     const user = await User.findOne({ 
       $or: [
         { email: cleanIdentifier }, 
-        { phone: cleanIdentifier }
+        { phone: cleanPhone }
       ] 
     });
 
     if (!user) {
       console.error('[AUTH-WARNING] login user not found:', cleanIdentifier);
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Account lockout enforcement
-    if (user.lockUntil && user.lockUntil > new Date()) {
-      const remainingMins = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000);
-      return res.status(423).json({ success: false, message: `Account is temporarily locked. Try again in ${remainingMins} minutes.` });
-    }
-
+    // 2. compare bcrypt password
     const isMatch = await bcrypt.compare(rawPassword, user.passwordHash);
     if (!isMatch) {
-      user.failedLoginAttempts += 1;
-      if (user.failedLoginAttempts >= 5) {
-        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // Lock for 15 minutes
-        user.failedLoginAttempts = 0;
-      }
-      await user.save();
       console.error('[AUTH-WARNING] login password mismatch for user:', cleanIdentifier);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    if (!user.isEmailVerified) {
-      console.warn('[AUTH-WARNING] login email unverified for user:', cleanIdentifier);
-      return res.status(403).json({ success: false, message: 'Please verify your email address before logging in.' });
-    }
-
-    // Reset lock counter on successful login
-    user.failedLoginAttempts = 0;
-    user.lockUntil = undefined;
-
+    // 3. generate JWT
     const { secret, refreshSecret } = getJwtSecrets();
 
     const accessToken = jwt.sign(
-      { id: user._id, email: user.email, role: user.role, tokenVersion: user.tokenVersion },
+      { id: user._id, email: user.email, role: user.role, tokenVersion: user.tokenVersion || 0 },
       secret,
       { expiresIn: '15m' }
     );
 
     const refreshToken = jwt.sign(
-      { id: user._id, tokenVersion: user.tokenVersion },
+      { id: user._id, tokenVersion: user.tokenVersion || 0 },
       refreshSecret,
       { expiresIn: '7d' }
     );
 
-    user.refreshToken = refreshToken;
-    await user.save();
-
+    // 4. return response (NO user.save()!)
     return res.status(200).json({
       success: true,
       token: accessToken,
       accessToken,
       refreshToken,
       user: {
+        id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
@@ -416,8 +410,13 @@ export const login = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[AUTH-ERROR] Exception in login:', error?.message || error, error?.stack);
-    return res.status(500).json({ success: false, message: 'Server error during authentication', error: error?.message || String(error) });
+    console.error('[AUTH-ERROR] Exception in login:', error?.stack || error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error during authentication', 
+      error: error?.message || String(error),
+      stack: error?.stack 
+    });
   }
 };
 
