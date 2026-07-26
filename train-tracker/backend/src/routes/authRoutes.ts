@@ -6,14 +6,26 @@ const router = Router();
 
 const safeHandler = (handlerName: keyof typeof authController | string) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const fn = (authController as any)[handlerName];
-    if (typeof fn === 'function') {
-      return fn(req, res, next);
+    try {
+      const fn = (authController as any)[handlerName];
+      if (typeof fn === 'function') {
+        return Promise.resolve(fn(req, res, next)).catch((err: any) => {
+          console.error(`[AUTH-ROUTE-ERROR] Unhandled error in ${String(handlerName)}:`, err);
+          if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Internal server error processing request' });
+          }
+        });
+      }
+      return res.status(501).json({
+        success: false,
+        message: `Authentication endpoint '${String(handlerName)}' is currently unavailable`
+      });
+    } catch (err: any) {
+      console.error(`[AUTH-ROUTE-EXCEPTION] Exception in ${String(handlerName)}:`, err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Internal server error processing request' });
+      }
     }
-    return res.status(501).json({
-      success: false,
-      message: `Authentication endpoint '${String(handlerName)}' is currently unavailable`
-    });
   };
 };
 
