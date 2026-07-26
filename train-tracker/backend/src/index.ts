@@ -45,12 +45,17 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error(`Unhandled Rejection: ${reason}`);
 });
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
+let isShuttingDown = false;
 const gracefulShutdown = async (signal: string) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   logger.info(`[PROCESS] ${signal} signal received. Starting graceful shutdown...`);
   console.log(`[PROCESS] ${signal} signal received. Starting graceful shutdown...`);
+
+  setTimeout(() => {
+    logger.error('[PROCESS] Forcefully shutting down server due to timeout.');
+    process.exit(1);
+  }, 10000);
 
   server.close(async () => {
     logger.info('[PROCESS] HTTP server closed.');
@@ -73,12 +78,10 @@ const gracefulShutdown = async (signal: string) => {
       process.exit(0);
     }
   });
-
-  setTimeout(() => {
-    logger.error('[PROCESS] Forcefully shutting down server due to timeout.');
-    process.exit(1);
-  }, 10000);
 };
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // CORS Configuration with origin whitelisting support
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
@@ -141,6 +144,33 @@ app.use(compression());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
+
+// Request Logging Middleware (before all routes)
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const logMsg = `[REQUEST] ${req.method} ${req.originalUrl || req.url}`;
+  console.log(logMsg);
+  logger.info(logMsg);
+  next();
+});
+
+// Immediate Health check & Root endpoints (return HTTP 200 immediately without accessing DB, Redis, Firebase or Auth)
+app.get('/', (req: express.Request, res: express.Response) => {
+  res.status(200).json({
+    success: true,
+    service: 'Train Tracker API',
+    status: 'running',
+    environment: process.env.NODE_ENV || 'production',
+    version: '1.0.0'
+  });
+});
+
+app.get(['/health', '/api/health', '/live', '/ready'], (req: express.Request, res: express.Response) => {
+  res.status(200).json({
+    status: 'OK',
+    uptime: `${Math.floor(process.uptime())}s`,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Rate Limiter configuration
 const apiLimiter = rateLimit({
@@ -425,33 +455,6 @@ async function initFirebase() {
     logger.warn(`[FIREBASE-WARNING] Failed to initialize Firebase: ${err?.message || err}. Continuing server startup...`);
   }
 }
-
-// Health check endpoints
-const healthHandler = (req: express.Request, res: express.Response) => {
-  res.status(200).json({
-    success: true,
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    redis: redisStatus,
-    firebase: firebaseStatus,
-    uptime: `${Math.floor(process.uptime())}s`,
-    timestamp: new Date().toISOString()
-  });
-};
-
-app.get('/health', healthHandler);
-app.get('/api/health', healthHandler);
-app.get('/live', (req, res) => res.status(200).json({ status: 'alive' }));
-app.get('/ready', healthHandler);
-
-app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    service: 'Train Tracker API',
-    status: 'running',
-    environment: process.env.NODE_ENV || 'production',
-    version: '1.0.0'
-  });
-});
 
 // Socket.IO Connection Handler
 io.on('connection', (socket) => {
