@@ -51,9 +51,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var currentScreen by mutableStateOf<Screen>(Screen.Splash)
         private set
 
+    val canGoBack: Boolean get() = screenStack.size > 1 && currentScreen != Screen.Home && currentScreen != Screen.Splash && currentScreen != Screen.Login
+
     fun navigateTo(screen: Screen) {
-        screenStack.add(screen)
-        currentScreen = screen
+        if (screen == Screen.Home) {
+            screenStack.clear()
+            screenStack.add(Screen.Home)
+            currentScreen = Screen.Home
+            return
+        }
+        if (currentScreen != screen) {
+            screenStack.add(screen)
+            currentScreen = screen
+        }
     }
 
     fun goBack() {

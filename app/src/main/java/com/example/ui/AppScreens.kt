@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -61,6 +62,10 @@ import kotlinx.coroutines.launch
 fun MainAppContainer(viewModel: AppViewModel) {
     val darkTheme = viewModel.isDarkMode
     val context = LocalContext.current
+
+    BackHandler(enabled = viewModel.canGoBack) {
+        viewModel.goBack()
+    }
 
     MaterialTheme(
         colorScheme = if (darkTheme) {
@@ -1191,11 +1196,35 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 .padding(16.dp)
         ) {
             DrawerItem(
+                icon = Icons.Default.Home,
+                title = "Home",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.navigateTo(Screen.Home)
+                }
+            )
+            DrawerItem(
                 icon = Icons.Default.Person,
                 title = "My Profile",
                 onClick = {
                     scope.launch { drawerState.close() }
                     viewModel.navigateTo(Screen.ProfileScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.MyLocation,
+                title = "Live Tracking",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.fetchLiveStatus("7UP")
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.Search,
+                title = "Train Search",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.navigateTo(Screen.TrainSearch)
                 }
             )
             DrawerItem(
@@ -1207,11 +1236,30 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 }
             )
             DrawerItem(
-                icon = Icons.Default.History,
-                title = "Recent Searches",
+                icon = Icons.Default.LocalShipping,
+                title = "Freight Trains",
                 onClick = {
                     scope.launch { drawerState.close() }
-                    viewModel.navigateTo(Screen.Home)
+                    viewModel.fetchFreightTrains()
+                    viewModel.navigateTo(Screen.FreightTrainsScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.Campaign,
+                title = "News & Updates",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.fetchNewsAndBlogs()
+                    viewModel.navigateTo(Screen.NewsBlogsScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.SelfImprovement,
+                title = "Weather & Namaz",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.fetchWeatherAndNamaz("Lahore")
+                    viewModel.navigateTo(Screen.NamazTimingsScreen)
                 }
             )
             DrawerItem(
@@ -1221,6 +1269,14 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 onClick = {
                     scope.launch { drawerState.close() }
                     viewModel.navigateTo(Screen.NotificationsScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.Phone,
+                title = "Emergency Helplines",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.navigateTo(Screen.HelplineScreen)
                 }
             )
             DrawerItem(
@@ -3270,7 +3326,7 @@ fun FavoritesScreen(viewModel: AppViewModel) {
     val stations by viewModel.favoriteStations.collectAsState()
 
     Scaffold(
-        topBar = { AppTopBar(title = Localization.getText("favorites", lang), lang = lang) }
+        topBar = { AppTopBar(title = Localization.getText("favorites", lang), lang = lang, onBack = { viewModel.goBack() }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -3404,7 +3460,7 @@ fun ProfileScreen(viewModel: AppViewModel) {
     }
 
     Scaffold(
-        topBar = { AppTopBar(title = Localization.getText("profile", lang), lang = lang) }
+        topBar = { AppTopBar(title = Localization.getText("profile", lang), lang = lang, onBack = { viewModel.goBack() }) }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -3675,7 +3731,7 @@ fun HelplineScreen(viewModel: AppViewModel) {
     )
 
     Scaffold(
-        topBar = { AppTopBar(title = "Helplines & Emergency Support", lang = lang) }
+        topBar = { AppTopBar(title = "Helplines & Emergency Support", lang = lang, onBack = { viewModel.goBack() }) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
