@@ -1,10 +1,9 @@
 # Build Stage
 FROM node:20-alpine AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY package*.json ./
-COPY tsconfig.json ./
+COPY package*.json tsconfig.json ./
 
 RUN npm ci
 
@@ -15,16 +14,17 @@ RUN npm run build
 # Production Stage
 FROM node:20-alpine AS runner
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
 ENV NODE_ENV=production
 
 COPY package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev && npm cache clean --force
 
-COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /app/dist ./dist
 
-EXPOSE 5000
+EXPOSE 8080
 
 CMD ["node", "dist/index.js"]
+

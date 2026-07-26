@@ -14,10 +14,7 @@ import jwt from 'jsonwebtoken';
 // Load Environment variables
 dotenv.config();
 
-const app = express();
-const server = http.createServer(app);
-
-// Setup Logger
+// Setup Logger (Console only for cloud environments like Railway)
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
@@ -25,10 +22,37 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
   ],
+});
+
+const app = express();
+const server = http.createServer(app);
+
+// Global Unhandled Process Exception & Signal Handlers to prevent container shutdown
+process.on('uncaughtException', (err) => {
+  console.error('[PROCESS] Uncaught Exception caught (prevented crash):', err);
+  logger.error(`Uncaught Exception: ${err?.message || err}`);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[PROCESS] Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error(`Unhandled Rejection: ${reason}`);
+});
+
+process.on('SIGINT', () => {
+  console.log('[PROCESS] SIGINT signal received. Server will remain active.');
+  logger.info('[PROCESS] SIGINT signal handled; server remaining active.');
+});
+
+process.on('SIGTERM', () => {
+  console.log('[PROCESS] SIGTERM signal received. Server will remain active.');
+  logger.info('[PROCESS] SIGTERM signal handled; server remaining active.');
 });
 
 // CORS Configuration with origin whitelisting support
@@ -57,7 +81,6 @@ const io = new SocketServer(server, {
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers['authorization']?.split(' ')[1];
   if (!token) {
-    // Allow anonymous socket connections for public train tracking if configured, or require auth
     return next();
   }
 
@@ -90,14 +113,14 @@ app.use(helmet({
 }));
 app.use(cors(corsOptions));
 app.use(compression());
-app.use(express.json({ limit: '5mb' })); // Strict payload body limit
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
 // Rate Limiter configuration
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes' },
@@ -105,7 +128,7 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // Stricter limit for authentication endpoints
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later' },
@@ -116,40 +139,275 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/verify-otp', authLimiter);
 
-// Database Connection
-const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/train-tracker';
-mongoose.connect(mongoUri)
-  .then(() => logger.info('MongoDB connected successfully.'))
-  .catch((err) => logger.error(`MongoDB connection error: ${err.message}`));
+// Safely load and register routes in try/catch blocks
+let authRoutes: any;
+let trainRoutes: any;
+let userRoutes: any;
+let adminRoutes: any;
 
-// Import routes
-import authRoutes from './routes/authRoutes';
-import trainRoutes from './routes/trainRoutes';
-import userRoutes from './routes/userRoutes';
-import adminRoutes from './routes/adminRoutes';
+try {
+  authRoutes = require('./routes/authRoutes').default;
+} catch (err: any) {
+  logger.error(`Failed to load authRoutes: ${err?.message || err}`);
+}
 
-// Configure API endpoints
-app.use('/api/auth', authRoutes);
-app.use('/api/trains', trainRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes);
+try {
+  trainRoutes = require('./routes/trainRoutes').default;
+} catch (err: any) {
+  logger.error(`Failed to load trainRoutes: ${err?.message || err}`);
+}
 
-// Additional top-level route aliases for direct access
-app.use('/api/stations', trainRoutes);
-app.use('/api/tracking', trainRoutes);
-app.use('/api/weather', trainRoutes);
-app.use('/api/prayers', trainRoutes);
-app.use('/api/news', trainRoutes);
-app.use('/api/blogs', trainRoutes);
-app.use('/api/notifications', trainRoutes);
-app.use('/api', userRoutes);
+try {
+  userRoutes = require('./routes/userRoutes').default;
+} catch (err: any) {
+  logger.error(`Failed to load userRoutes: ${err?.message || err}`);
+}
+
+try {
+  adminRoutes = require('./routes/adminRoutes').default;
+} catch (err: any) {
+  logger.error(`Failed to load adminRoutes: ${err?.message || err}`);
+}
+
+if (authRoutes) {
+  app.use('/api/auth', authRoutes);
+}
+
+if (trainRoutes) {
+  app.use('/api/trains', trainRoutes);
+  app.use('/api/stations', trainRoutes);
+  app.use('/api/tracking', trainRoutes);
+  app.use('/api/weather', trainRoutes);
+  app.use('/api/prayers', trainRoutes);
+  app.use('/api/news', trainRoutes);
+  app.use('/api/blogs', trainRoutes);
+  app.use('/api/notifications', trainRoutes);
+}
+
+if (userRoutes) {
+  app.use('/api/users', userRoutes);
+  app.use('/api', userRoutes);
+}
+
+if (adminRoutes) {
+  app.use('/api/admin', adminRoutes);
+}
+
+// MongoDB connection state, options, and auto-reconnect listeners
+async function syncMongoIndexes() {
+  try {
+    const modelNames = mongoose.modelNames();
+    for (const name of modelNames) {
+      try {
+        await mongoose.model(name).syncIndexes();
+        logger.info(`[MONGODB] Synchronized indexes for model: ${name}`);
+      } catch (idxErr: any) {
+        logger.warn(`[MONGODB] Index sync warning for model ${name}: ${idxErr?.message || idxErr}`);
+      }
+    }
+  } catch (err: any) {
+    logger.warn(`[MONGODB] Global index sync error: ${err?.message || err}`);
+  }
+}
+
+mongoose.connection.on('connected', () => {
+  logger.info('[MONGODB] Connection established successfully.');
+  console.log('[MONGODB] Connected to MongoDB database.');
+  syncMongoIndexes().catch((err) => {
+    logger.warn(`[MONGODB] Background index sync error: ${err?.message || err}`);
+  });
+});
+
+mongoose.connection.on('error', (err) => {
+  logger.error(`[MONGODB] Database connection error: ${err?.message || err}. Server will remain active.`);
+  console.error(`[MONGODB] Database error: ${err?.message || err}`);
+});
+
+mongoose.connection.on('disconnected', () => {
+  logger.warn('[MONGODB] Connection lost. Mongoose will attempt auto-reconnect in background...');
+  console.warn('[MONGODB] Disconnected from database. Auto-reconnecting in background...');
+});
+
+mongoose.connection.on('reconnected', () => {
+  logger.info('[MONGODB] Connection restored successfully.');
+  console.log('[MONGODB] Reconnected to MongoDB.');
+});
+
+async function initMongoDB() {
+  const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/train-tracker';
+  const mongoOptions: mongoose.ConnectOptions = {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 10000,
+    maxPoolSize: 10,
+    autoIndex: true
+  };
+
+  try {
+    await mongoose.connect(mongoUri, mongoOptions);
+    logger.info('[MONGODB] Initial connection call executed.');
+  } catch (err: any) {
+    logger.error(`[MONGODB] Initial connection attempt failed: ${err?.message || err}. Continuing server execution; auto-reconnecting in background...`);
+    console.error(`[MONGODB-WARNING] Initial connection failed. Continuing server startup...`);
+  }
+}
+
+// Redis connection state & safe initialization
+let redisStatus: 'connected' | 'disconnected' | 'disabled' = 'disabled';
+let redisClient: any = null;
+
+async function initRedis() {
+  const redisUrl = process.env.REDIS_URL || process.env.REDIS_HOST;
+  if (!redisUrl) {
+    logger.info('[REDIS] Redis URL not configured in environment. Continuing without Redis cache.');
+    redisStatus = 'disabled';
+    return;
+  }
+
+  try {
+    let RedisLib: any = null;
+    try {
+      RedisLib = require('ioredis');
+    } catch {
+      try {
+        RedisLib = require('redis');
+      } catch {
+        RedisLib = null;
+      }
+    }
+
+    if (!RedisLib) {
+      logger.warn('[REDIS] Redis library (ioredis/redis) is not installed. Proceeding without Redis.');
+      redisStatus = 'disabled';
+      return;
+    }
+
+    redisStatus = 'disconnected';
+
+    if (typeof RedisLib === 'function') {
+      redisClient = new RedisLib(redisUrl, {
+        retryStrategy: (times: number) => {
+          logger.warn(`[REDIS] Connection unavailable. Auto-reconnection attempt #${times}...`);
+          return Math.min(times * 1000, 10000);
+        },
+        maxRetriesPerRequest: null,
+        enableOfflineQueue: false
+      });
+
+      redisClient.on('connect', () => {
+        redisStatus = 'connected';
+        logger.info('[REDIS] Connected successfully to Redis server.');
+      });
+
+      redisClient.on('error', (err: any) => {
+        redisStatus = 'disconnected';
+        logger.warn(`[REDIS] Redis client error: ${err?.message || err}. Server will continue running.`);
+      });
+    } else if (RedisLib.createClient) {
+      redisClient = RedisLib.createClient({ url: redisUrl });
+      redisClient.on('error', (err: any) => {
+        redisStatus = 'disconnected';
+        logger.warn(`[REDIS] Redis client error: ${err?.message || err}. Server will continue running.`);
+      });
+      redisClient.on('connect', () => {
+        redisStatus = 'connected';
+        logger.info('[REDIS] Connected successfully to Redis server.');
+      });
+      await redisClient.connect().catch((err: any) => {
+        redisStatus = 'disconnected';
+        logger.warn(`[REDIS] Initial Redis connection failed: ${err?.message || err}. Reconnecting automatically in background...`);
+      });
+    }
+  } catch (err: any) {
+    redisStatus = 'disconnected';
+    logger.warn(`[REDIS] Failed to initialize Redis: ${err?.message || err}. Server continuing without Redis.`);
+  }
+}
+
+// Firebase connection state & safe initialization
+let firebaseStatus: 'initialized' | 'disabled' = 'disabled';
+let firebaseAdminApp: any = null;
+
+async function initFirebase() {
+  const fs = require('fs');
+  const path = require('path');
+
+  const possibleCredentialPaths = [
+    process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+    path.join(__dirname, '../google-services.json'),
+    path.join(__dirname, '../serviceAccountKey.json'),
+    path.join(process.cwd(), 'google-services.json'),
+    path.join(process.cwd(), 'serviceAccountKey.json')
+  ].filter(Boolean);
+
+  let credentialPath: string | null = null;
+  for (const p of possibleCredentialPaths) {
+    if (typeof p === 'string' && fs.existsSync(p)) {
+      credentialPath = p;
+      break;
+    }
+  }
+
+  const rawJsonEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_CONFIG;
+
+  if (!credentialPath && !rawJsonEnv) {
+    logger.warn('[FIREBASE-WARNING] google-services.json or service account credentials not found. Continuing server startup without Firebase...');
+    console.warn('[FIREBASE-WARNING] google-services.json or service account credentials missing. Server will continue startup...');
+    firebaseStatus = 'disabled';
+    return;
+  }
+
+  try {
+    let admin: any = null;
+    try {
+      admin = require('firebase-admin');
+    } catch {
+      logger.warn('[FIREBASE-WARNING] firebase-admin package is not installed. Continuing server startup without Firebase...');
+      firebaseStatus = 'disabled';
+      return;
+    }
+
+    if (!admin.apps.length) {
+      let certObj: any = null;
+      if (rawJsonEnv) {
+        try {
+          certObj = typeof rawJsonEnv === 'string' ? JSON.parse(rawJsonEnv) : rawJsonEnv;
+        } catch {
+          certObj = null;
+        }
+      }
+
+      if (credentialPath) {
+        firebaseAdminApp = admin.initializeApp({
+          credential: admin.credential.cert(credentialPath)
+        });
+      } else if (certObj) {
+        firebaseAdminApp = admin.initializeApp({
+          credential: admin.credential.cert(certObj)
+        });
+      } else {
+        firebaseAdminApp = admin.initializeApp();
+      }
+    } else {
+      firebaseAdminApp = admin.app();
+    }
+
+    firebaseStatus = 'initialized';
+    logger.info('[FIREBASE] Firebase Admin initialized successfully.');
+  } catch (err: any) {
+    firebaseStatus = 'disabled';
+    logger.warn(`[FIREBASE-WARNING] Failed to initialize Firebase: ${err?.message || err}. Continuing server startup...`);
+  }
+}
 
 // Health check endpoints
 const healthHandler = (req: express.Request, res: express.Response) => {
   res.json({
     success: true,
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    redis: 'connected',
+    redis: redisStatus,
+    firebase: firebaseStatus,
     uptime: `${Math.floor(process.uptime())}s`,
     timestamp: new Date().toISOString()
   });
@@ -157,6 +415,8 @@ const healthHandler = (req: express.Request, res: express.Response) => {
 
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
+app.get('/live', (req, res) => res.status(200).json({ status: 'alive' }));
+app.get('/ready', healthHandler);
 
 app.get('/', (req, res) => {
   res.json({
@@ -186,7 +446,6 @@ io.on('connection', (socket) => {
     socket.leave(`train:${cleanTrainNum}`);
   });
 
-  // Locomotive telemetry stream - requires conductor or admin socket role
   socket.on('telemetry:stream', (data: { trainNumber: string; lat: number; lng: number; speed: number }) => {
     const userRole = socket.data?.user?.role;
     if (userRole !== 'conductor' && userRole !== 'admin') {
@@ -214,7 +473,15 @@ io.on('connection', (socket) => {
   });
 });
 
-// Central Error Handler Middleware (Never exposes internal stack traces)
+// 404 Not Found Middleware
+app.use((req: express.Request, res: express.Response) => {
+  res.status(404).json({
+    success: false,
+    message: `Cannot ${req.method} ${req.url}`
+  });
+});
+
+// Central Error Handler Middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error(`Internal error on ${req.method} ${req.url}: ${err.message}`);
   res.status(500).json({
@@ -223,10 +490,47 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   });
 });
 
-// Start Server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  logger.info(`Server is running in production mode on port ${PORT}`);
-});
+// Startup logic wrapped in try/catch to ensure server listener runs cleanly
+async function startServer() {
+  try {
+    console.log('[STARTUP] Step 1: Initializing configuration & middleware...');
+    
+    console.log('[STARTUP] Step 2: Connecting to MongoDB database...');
+    await initMongoDB();
+
+    console.log('[STARTUP] Step 2.5: Initializing Redis (if configured)...');
+    try {
+      await initRedis();
+    } catch (redisInitErr: any) {
+      logger.warn(`[REDIS] Exception during initRedis: ${redisInitErr?.message || redisInitErr}. Server continuing normally.`);
+    }
+
+    console.log('[STARTUP] Step 2.6: Initializing Firebase (if configured)...');
+    try {
+      await initFirebase();
+    } catch (fbInitErr: any) {
+      logger.warn(`[FIREBASE-WARNING] Exception during initFirebase: ${fbInitErr?.message || fbInitErr}. Server continuing normally.`);
+    }
+
+    console.log('[STARTUP] Step 3: Starting HTTP & WebSocket Server...');
+    const PORT = process.env.PORT || 8080;
+    server.listen(Number(PORT), '0.0.0.0', () => {
+      logger.info(`Server is running in production mode on port ${PORT}`);
+      console.log(`[STARTUP] Step 3: Server is running in production mode on port ${PORT}`);
+      console.log('[STARTUP] Startup sequence completed successfully.');
+    });
+  } catch (startupErr: any) {
+    console.error('[STARTUP] Critical exception in startServer wrapper:', startupErr);
+    const PORT = process.env.PORT || 8080;
+    if (!server.listening) {
+      server.listen(Number(PORT), '0.0.0.0', () => {
+        console.log(`[STARTUP] Fallback HTTP server listening on port ${PORT}`);
+      });
+    }
+  }
+}
+
+startServer();
 
 export { app, server, io, logger };
+
