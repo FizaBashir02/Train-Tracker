@@ -22,7 +22,7 @@ import com.example.data.model.*
         PrayerTimesCacheEntity::class,
         AnalyticsEvent::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

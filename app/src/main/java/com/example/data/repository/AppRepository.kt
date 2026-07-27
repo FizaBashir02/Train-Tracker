@@ -126,31 +126,6 @@ class AppRepository(context: Context) {
         }
     }
 
-    suspend fun forgotPassword(email: String): Boolean {
-        val response = ApiClient.apiService.forgotPassword(ForgotPasswordRequest(email))
-        logAnalyticsEvent("remote_forgot_password_success", "email: $email")
-        return response.success
-    }
-
-    suspend fun resetPassword(email: String, otpCode: String, newPasswordHash: String): Boolean {
-        val response = ApiClient.apiService.resetPassword(ResetPasswordRequest(email, otpCode, newPasswordHash))
-        if (response.success) {
-            val user = userDao.getUserByEmailOrPhone(email, email)
-            if (user != null) {
-                val updated = user.copy(passwordHash = newPasswordHash)
-                userDao.updateUser(updated)
-            }
-            addNotification(
-                "Password Reset Success",
-                "Your account password was changed successfully.",
-                "alert"
-            )
-            logAnalyticsEvent("password_reset", "user_email: $email")
-            return true
-        }
-        return false
-    }
-
     suspend fun updateProfile(firstName: String, lastName: String, email: String, phone: String): Boolean {
         try {
             val response = ApiClient.apiService.updateProfile(UpdateProfileRequest(firstName, lastName, phone))
@@ -570,51 +545,40 @@ class AppRepository(context: Context) {
         }
     }
 
-    suspend fun getNamazTimingsApi(location: String): NamazTimingsData {
+    suspend fun getNamazTimingsApi(location: String, settings: com.example.util.PrayerTimingSettings = com.example.util.PrayerTimingSettings()): NamazTimingsData {
         logAnalyticsEvent("namaz_fetch", "location: $location")
-        val cached = prayerTimesCacheDao.getPrayerTimes(location)
-        if (cached != null && (System.currentTimeMillis() - cached.timestamp < 24 * 60 * 60 * 1000)) {
-            return NamazTimingsData(
-                islamicDate = cached.date,
-                fajr = cached.fajr,
-                dhuhr = cached.dhuhr,
-                asr = cached.asr,
-                maghrib = cached.maghrib,
-                isha = cached.isha,
-                qiblaDirection = "261° (W)"
+        val coords = com.example.util.PrayerTimeCalculator.getCoordinatesForCity(location)
+        val calculated = com.example.util.PrayerTimeCalculator.calculatePrayerTimes(
+            locationName = location,
+            lat = coords.lat,
+            lng = coords.lng,
+            settings = settings
+        )
+
+        prayerTimesCacheDao.insertPrayerTimes(
+            PrayerTimesCacheEntity(
+                city = location,
+                date = calculated.hijriDate,
+                fajr = calculated.fajr,
+                sunrise = calculated.sunrise,
+                dhuhr = calculated.dhuhr,
+                asr = calculated.asr,
+                maghrib = calculated.maghrib,
+                isha = calculated.isha,
+                timestamp = System.currentTimeMillis()
             )
-        }
-        return try {
-            val remote = ApiClient.apiService.getNamazTimings(location)
-            prayerTimesCacheDao.insertPrayerTimes(
-                PrayerTimesCacheEntity(
-                    city = location,
-                    date = remote.islamicDate,
-                    fajr = remote.fajr,
-                    dhuhr = remote.dhuhr,
-                    asr = remote.asr,
-                    maghrib = remote.maghrib,
-                    isha = remote.isha,
-                    timestamp = System.currentTimeMillis()
-                )
-            )
-            remote
-        } catch (e: Exception) {
-            logAnalyticsEvent("retrofit_namaz_failed", "error: ${e.message}. Using cache fallback.")
-            if (cached != null) {
-                NamazTimingsData(
-                    islamicDate = cached.date,
-                    fajr = cached.fajr,
-                    dhuhr = cached.dhuhr,
-                    asr = cached.asr,
-                    maghrib = cached.maghrib,
-                    isha = cached.isha,
-                    qiblaDirection = "261° (W)"
-                )
-            } else {
-                throw e
-            }
-        }
+        )
+
+        return NamazTimingsData(
+            islamicDate = calculated.hijriDate,
+            fajr = calculated.fajr,
+            sunrise = calculated.sunrise,
+            dhuhr = calculated.dhuhr,
+            asr = calculated.asr,
+            maghrib = calculated.maghrib,
+            isha = calculated.isha,
+            qiblaDirection = calculated.qiblaDirection
+        )
     }
 
     suspend fun getNewsApi(): List<NewsItem> {

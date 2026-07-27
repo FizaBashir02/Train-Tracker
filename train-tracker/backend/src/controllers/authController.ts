@@ -132,10 +132,10 @@ export const signUp = async (req: Request, res: Response) => {
     const rawPassword = req.body.password || req.body.passwordHash;
 
     const fieldErrors: Record<string, string> = {};
-    if (!firstName) fieldErrors.firstName = 'First name is required';
-    if (!lastName) fieldErrors.lastName = 'Last name is required';
-    if (!email) fieldErrors.email = 'Email address is required';
-    if (!phone) fieldErrors.phone = 'Phone number is required';
+    if (!firstName || !firstName.trim()) fieldErrors.firstName = 'First name is required';
+    if (!lastName || !lastName.trim()) fieldErrors.lastName = 'Last name is required';
+    if (!email || !email.trim()) fieldErrors.email = 'Email address is required';
+    if (!phone || !phone.trim()) fieldErrors.phone = 'Phone number is required';
     if (!rawPassword) fieldErrors.password = 'Password is required';
 
     if (Object.keys(fieldErrors).length > 0) {
@@ -150,34 +150,62 @@ export const signUp = async (req: Request, res: Response) => {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
+    const strippedPhone = cleanPhone.replace(/[\s\-]/g, '');
 
-    const pwdCheck = isStrongPassword(rawPassword);
-    if (!pwdCheck.valid) {
-      console.error('[VALIDATION-ERROR] signUp weak password:', pwdCheck.reason);
-      const errors = { password: pwdCheck.reason || 'Password does not meet security requirements' };
+    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
+    if (!isEmailValid) {
+      const errors = { email: 'Invalid email address format' };
       return res.status(400).json({
         success: false,
-        message: pwdCheck.reason,
+        message: 'Invalid email address format',
         errors,
         fieldErrors: errors
       });
     }
 
-    const existingUser = await User.findOne({ 
-      $or: [
-        { email: cleanEmail }, 
-        { phone: cleanPhone }
-      ] 
-    });
-
-    if (existingUser) {
-      const field = existingUser.email === cleanEmail ? 'email' : 'phone';
-      const matchReason = existingUser.email === cleanEmail ? 'Email already registered' : 'Phone number already registered';
-      console.error('[VALIDATION-ERROR] signUp duplicate user:', matchReason);
-      const errors = { [field]: matchReason };
+    const isPakistaniPhone = /^((\+923|923|03)\d{9})$/.test(strippedPhone);
+    if (!isPakistaniPhone) {
+      const errors = { phone: 'Invalid Pakistani mobile number format (e.g. 03001234567 or +923001234567)' };
       return res.status(400).json({
         success: false,
-        message: matchReason,
+        message: 'Invalid Pakistani mobile number format',
+        errors,
+        fieldErrors: errors
+      });
+    }
+
+    if (rawPassword.length < 8) {
+      const errors = { password: 'Password must be at least 8 characters' };
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters',
+        errors,
+        fieldErrors: errors
+      });
+    }
+
+    const existingEmail = await User.findOne({ email: cleanEmail });
+    if (existingEmail) {
+      const errors = { email: 'Email already registered' };
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered',
+        errors,
+        fieldErrors: errors
+      });
+    }
+
+    const existingPhone = await User.findOne({ 
+      $or: [
+        { phone: cleanPhone },
+        { phone: strippedPhone }
+      ]
+    });
+    if (existingPhone) {
+      const errors = { phone: 'Phone number already registered' };
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number already registered',
         errors,
         fieldErrors: errors
       });
@@ -186,11 +214,6 @@ export const signUp = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(rawPassword, salt);
 
-    // Cryptographically secure numeric OTP code
-    const otpBuffer = crypto.randomBytes(2);
-    const otpCode = (1000 + (otpBuffer.readUInt16BE(0) % 9000)).toString();
-    const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
-
     let userRole = (req.body.role || 'USER').toString().trim();
     const validRoles = ['USER', 'user', 'passenger', 'admin', 'conductor'];
     if (!userRole || !validRoles.includes(userRole)) {
@@ -198,17 +221,16 @@ export const signUp = async (req: Request, res: Response) => {
     }
 
     const newUser = new User({
-      firstName,
-      lastName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       email: cleanEmail,
       phone: cleanPhone,
       passwordHash: hashedPassword,
       role: userRole,
-      isEmailVerified: false,
-      otpCode,
-      otpExpiry,
+      isVerified: true,
+      isActive: true,
+      isEmailVerified: true,
       otpAttempts: 0,
-      lastOtpSentAt: new Date(),
       failedLoginAttempts: 0,
       passwordHistory: [hashedPassword],
       tokenVersion: 0
@@ -216,21 +238,10 @@ export const signUp = async (req: Request, res: Response) => {
 
     await newUser.save();
 
-    const mailText = `Welcome to Pakistan Railways Companion app! Use code ${otpCode} to verify your email address. Valid for 15 minutes.`;
-    
-    try {
-      const emailResult = await sendEmail(cleanEmail, "Verify Your Email Address", mailText);
-      if (!emailResult.success) {
-        console.error(`[SMTP-ERROR] signUp verification email failed for ${cleanEmail}:`, emailResult.message || emailResult.error);
-      }
-    } catch (smtpErr: any) {
-      console.error(`[SMTP-ERROR] Exception sending verification email to ${cleanEmail}:`, smtpErr?.message || smtpErr, smtpErr);
-    }
-
     try {
       await Notification.create({
         title: "Welcome aboard!",
-        message: `Your companion account has been pre-registered. Use code ${otpCode} to verify your email.`,
+        message: `Your companion account has been registered successfully.`,
         category: "broadcast",
         recipientEmail: cleanEmail
       });
@@ -240,8 +251,7 @@ export const signUp = async (req: Request, res: Response) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful. Verification OTP sent to registered email.',
-      email: cleanEmail
+      message: 'Account created successfully'
     });
   } catch (error: any) {
     console.error('[AUTH-ERROR] Exception in signUp:', error?.stack || error);
@@ -490,144 +500,6 @@ export const logoutAllDevices = async (req: AuthenticatedRequest, res: Response)
     return res.status(200).json({ success: true, message: 'Logged out from all devices successfully' });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to revoke sessions across devices' });
-  }
-};
-
-export const forgotPassword = async (req: Request, res: Response) => {
-  try {
-    console.log('[AUTH] forgotPassword request body:', getSafeBody(req.body));
-
-    const valErrors = validationResult(req);
-    if (!valErrors.isEmpty()) {
-      console.error('[VALIDATION-ERROR] forgotPassword validation errors:', JSON.stringify(valErrors.array()));
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: valErrors.array(),
-        fieldErrors: valErrors.mapped()
-      });
-    }
-
-    const { email } = req.body;
-    if (!email) {
-      const fieldErrors = { email: 'Email address is required' };
-      console.error('[VALIDATION-ERROR] forgotPassword missing email:', fieldErrors);
-      return res.status(400).json({
-        success: false,
-        message: 'Email address is required',
-        errors: fieldErrors,
-        fieldErrors
-      });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
-
-    // Prevent user enumeration by returning consistent success message
-    if (!user) {
-      return res.status(200).json({
-        success: true,
-        message: 'If a matching account exists, a password reset code has been sent.'
-      });
-    }
-
-    // Cooldown check: 1 minute between OTP requests
-    if (user.lastOtpSentAt) {
-      const lastTime = new Date(user.lastOtpSentAt).getTime();
-      if (!isNaN(lastTime) && (Date.now() - lastTime) < 60000) {
-        return res.status(429).json({ success: false, message: 'Please wait before requesting another reset code.' });
-      }
-    }
-
-    const otpBuffer = crypto.randomBytes(2);
-    const otpCode = (1000 + (otpBuffer.readUInt16BE(0) % 9000)).toString();
-    user.otpCode = otpCode;
-    user.otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
-    user.otpAttempts = 0;
-    user.lastOtpSentAt = new Date();
-    await user.save();
-
-    const resetText = `Your companion app password reset code is ${otpCode}. Valid for 15 minutes.`;
-
-    try {
-      const emailResult = await sendEmail(cleanEmail, "Reset Your Password", resetText);
-      if (!emailResult.success) {
-        console.error(`[SMTP-ERROR] forgotPassword email failed to send to ${cleanEmail}:`, emailResult.message || emailResult.error);
-      }
-    } catch (smtpErr: any) {
-      console.error(`[SMTP-ERROR] Exception sending password reset email to ${cleanEmail}:`, smtpErr?.message || smtpErr, smtpErr);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'If a matching account exists, a password reset code has been sent.'
-    });
-  } catch (error: any) {
-    console.error('[AUTH-ERROR] Exception in forgotPassword:', error?.message || error, error?.stack);
-    return res.status(500).json({ success: false, message: 'Server error processing request', error: error?.message || String(error) });
-  }
-};
-
-export const resetPassword = async (req: Request, res: Response) => {
-  try {
-    const { email, otpCode, newPasswordHash } = req.body;
-    if (!email || !otpCode || !newPasswordHash) {
-      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
-    }
-
-    const pwdCheck = isStrongPassword(newPasswordHash);
-    if (!pwdCheck.valid) {
-      return res.status(400).json({ success: false, message: pwdCheck.reason });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
-
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid request' });
-    }
-
-    if (user.otpAttempts >= 5) {
-      return res.status(429).json({ success: false, message: 'Too many invalid attempts. Request a new code.' });
-    }
-
-    if (user.otpCode !== otpCode || !user.otpExpiry || user.otpExpiry < new Date()) {
-      user.otpAttempts += 1;
-      await user.save();
-      return res.status(400).json({ success: false, message: 'Invalid or expired reset code' });
-    }
-
-    // Check Password History (prevent re-using previous passwords)
-    for (const oldHash of user.passwordHistory || []) {
-      const isReused = await bcrypt.compare(newPasswordHash, oldHash);
-      if (isReused) {
-        return res.status(400).json({ success: false, message: 'You cannot reuse a recent password.' });
-      }
-    }
-
-    const salt = await bcrypt.genSalt(12);
-    const newHash = await bcrypt.hash(newPasswordHash, salt);
-
-    user.passwordHash = newHash;
-    user.otpCode = undefined;
-    user.otpExpiry = undefined;
-    user.otpAttempts = 0;
-    user.refreshToken = undefined;
-    user.tokenVersion += 1; // Revoke all active sessions
-    
-    user.passwordHistory.push(newHash);
-    if (user.passwordHistory.length > 5) {
-      user.passwordHistory.shift(); // Keep last 5 passwords
-    }
-
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Password updated successfully. Please log in with your new password.'
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error resetting password' });
   }
 };
 

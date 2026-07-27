@@ -35,16 +35,6 @@ data class OtpRequest(
     val otpCode: String
 )
 
-data class ForgotPasswordRequest(
-    val email: String
-)
-
-data class ResetPasswordRequest(
-    val email: String,
-    val otpCode: String,
-    val newPasswordHash: String
-)
-
 data class FcmTokenRequest(
     val email: String,
     val fcmToken: String
@@ -103,12 +93,6 @@ interface ApiService {
 
     @POST("auth/verify-otp")
     suspend fun verifyOtp(@Body request: OtpRequest): AuthResponse
-
-    @POST("auth/forgot-password")
-    suspend fun forgotPassword(@Body request: ForgotPasswordRequest): ApiGenericResponse
-
-    @POST("auth/reset-password")
-    suspend fun resetPassword(@Body request: ResetPasswordRequest): ApiGenericResponse
 
     @POST("auth/register-fcm-token")
     suspend fun registerFcmToken(@Body request: FcmTokenRequest): ApiGenericResponse
@@ -306,10 +290,10 @@ object ApiClient {
                     "Server error (HTTP ${e.code()})"
                 }
             } else {
-                e.message ?: "Network connection error. Please check your internet connection."
+                e.message ?: "Unable to connect to the server. Please check your internet connection and try again."
             }
         } catch (ex: Exception) {
-            "Network error or server is offline"
+            "Unable to connect to the server. Please check your internet connection and try again."
         }
     }
 }

@@ -48,9 +48,6 @@ router.post('/login', safeHandler('login'));
 router.post('/refresh', safeHandler('refreshSessionToken'));
 router.post('/refreshToken', safeHandler('refreshSessionToken'));
 
-router.post('/forgot-password', safeHandler('forgotPassword'));
-router.post('/reset-password', safeHandler('resetPassword'));
-
 // Authenticated routes
 router.post('/logout', safeAuth, safeHandler('logout'));
 router.post('/logout-all', safeAuth, safeHandler('logoutAllDevices'));

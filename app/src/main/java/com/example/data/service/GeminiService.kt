@@ -107,6 +107,7 @@ data class WeatherData(
 data class NamazTimingsData(
     val islamicDate: String,
     val fajr: String,
+    val sunrise: String = "05:30 AM",
     val dhuhr: String,
     val asr: String,
     val maghrib: String,
@@ -668,6 +669,7 @@ object GeminiService {
                 return NamazTimingsData(
                     islamicDate = o.optString("islamicDate", "25 Muharram 1448 AH"),
                     fajr = o.optString("fajr", "04:12 AM"),
+                    sunrise = o.optString("sunrise", "05:32 AM"),
                     dhuhr = o.optString("dhuhr", "12:18 PM"),
                     asr = o.optString("asr", "04:55 PM"),
                     maghrib = o.optString("maghrib", "07:12 PM"),
@@ -678,7 +680,7 @@ object GeminiService {
                 Log.e(TAG, "Failed to parse Namaz JSON", e)
             }
         }
-        return NamazTimingsData("25 Muharram 1448 AH", "04:10 AM", "12:15 PM", "04:50 PM", "07:10 PM", "08:40 PM", "262° W")
+        return NamazTimingsData("25 Muharram 1448 AH", "04:10 AM", "05:30 AM", "12:15 PM", "04:50 PM", "07:10 PM", "08:40 PM", "262° W")
     }
 
     // --- Railway News & Blogs ---

@@ -7,6 +7,8 @@ export interface IUser extends Document {
   phone: string;
   passwordHash: string;
   role: 'passenger' | 'admin' | 'conductor' | 'USER' | 'user';
+  isVerified: boolean;
+  isActive: boolean;
   isEmailVerified: boolean;
   profilePictureUrl?: string;
   otpCode?: string;
@@ -30,6 +32,8 @@ const UserSchema: Schema = new Schema({
   phone: { type: String, required: true, unique: true, trim: true },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ['passenger', 'admin', 'conductor', 'USER', 'user'], default: 'passenger' },
+  isVerified: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: true },
   isEmailVerified: { type: Boolean, default: false },
   profilePictureUrl: { type: String },
   otpCode: { type: String },

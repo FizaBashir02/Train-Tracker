@@ -122,6 +122,7 @@ data class PrayerTimesCacheEntity(
     @PrimaryKey val city: String,
     val date: String,
     val fajr: String,
+    val sunrise: String = "05:30 AM",
     val dhuhr: String,
     val asr: String,
     val maghrib: String,

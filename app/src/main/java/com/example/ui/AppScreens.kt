@@ -371,7 +371,7 @@ fun OnboardingScreen(viewModel: AppViewModel) {
         ),
         Triple(
             "Station & Local Services",
-            "Check local weather, Islamic Namaz prayer timings, station facilities, and local news at your fingertips.",
+            "Check local weather, Islamic prayer timings, station facilities, and local news at your fingertips.",
             Icons.Default.Info
         )
     )
@@ -484,17 +484,8 @@ fun LoginScreen(viewModel: AppViewModel) {
     var rememberMe by remember { mutableStateOf(true) }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-
-    // Forgot password dialog state
-    var showForgotDialog by remember { mutableStateOf(false) }
-    var forgotEmailState by remember { mutableStateOf("") }
-    var forgotOtpState by remember { mutableStateOf("") }
-    var forgotNewPassState by remember { mutableStateOf("") }
-    var forgotStepState by remember { mutableStateOf(1) } // 1: Email, 2: OTP & New Password
-    var forgotErrorState by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = { AppTopBar(title = Localization.getText("login", lang), lang = lang) }
@@ -541,13 +532,13 @@ fun LoginScreen(viewModel: AppViewModel) {
                 OutlinedTextField(
                     value = identifier,
                     onValueChange = { identifier = it },
-                    label = { Text(text = Localization.getText("email", lang)) },
+                    label = { Text(text = "Email or Phone Number") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("login_username_input"),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email,
+                        keyboardType = KeyboardType.Text,
                         autoCorrect = false
                     ),
                     shape = RoundedCornerShape(12.dp)
@@ -580,26 +571,23 @@ fun LoginScreen(viewModel: AppViewModel) {
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
-                        Text(text = "Remember Me", fontSize = 14.sp)
-                    }
-                    TextButton(onClick = {
-                        forgotEmailState = identifier
-                        forgotOtpState = ""
-                        forgotNewPassState = ""
-                        forgotStepState = 1
-                        forgotErrorState = null
-                        showForgotDialog = true
-                    }) {
-                        Text(text = "Forgot Password?", color = MaterialTheme.colorScheme.primary)
-                    }
+                    Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+                    Text(text = "Remember Me", fontSize = 14.sp)
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                viewModel.successMessage?.let { successMsg ->
+                    Text(
+                        text = successMsg,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
 
                 viewModel.errorMessage?.let { error ->
                     Text(
@@ -615,7 +603,7 @@ fun LoginScreen(viewModel: AppViewModel) {
                         focusManager.clearFocus()
                         keyboardController?.hide()
                         if (identifier.isNotEmpty() && password.isNotEmpty()) {
-                            viewModel.login(identifier, password) { }
+                            viewModel.login(identifier.trim(), password) { }
                         } else {
                             viewModel.errorMessage = "Please fill all fields"
                         }
@@ -638,100 +626,6 @@ fun LoginScreen(viewModel: AppViewModel) {
 
             if (viewModel.isLoading) {
                 LoadingOverlay(lang)
-            }
-
-            // Forgot / Reset password dialog
-            if (showForgotDialog) {
-                AlertDialog(
-                    onDismissRequest = { showForgotDialog = false },
-                    title = { Text(text = if (forgotStepState == 1) "Forgot Password" else "Reset Password") },
-                    text = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            forgotErrorState?.let { err ->
-                                Text(text = err, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-
-                            if (forgotStepState == 1) {
-                                Text(text = "Enter your registered email address or phone number to receive a verification OTP.")
-                                OutlinedTextField(
-                                    value = forgotEmailState,
-                                    onValueChange = { forgotEmailState = it },
-                                    label = { Text("Email or Phone") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                            } else {
-                                Text(text = "Enter the 4-digit OTP code sent in notifications and your new password.")
-                                OutlinedTextField(
-                                    value = forgotOtpState,
-                                    onValueChange = { forgotOtpState = it },
-                                    label = { Text("OTP Code") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                OutlinedTextField(
-                                    value = forgotNewPassState,
-                                    onValueChange = { forgotNewPassState = it },
-                                    label = { Text("New Password") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    visualTransformation = PasswordVisualTransformation(),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                if (forgotStepState == 1) {
-                                    if (forgotEmailState.trim().isEmpty()) {
-                                        forgotErrorState = "Please enter email/phone"
-                                        return@Button
-                                    }
-                                    viewModel.forgotPassword(forgotEmailState.trim()) { success ->
-                                        if (success) {
-                                            forgotStepState = 2
-                                            forgotErrorState = null
-                                        } else {
-                                            forgotErrorState = viewModel.errorMessage ?: "Account not found or network error"
-                                        }
-                                    }
-                                } else {
-                                    if (forgotOtpState.trim().isEmpty()) {
-                                        forgotErrorState = "Please enter the OTP Code"
-                                        return@Button
-                                    }
-                                    if (forgotNewPassState.trim().length < 4) {
-                                        forgotErrorState = "Password must be at least 4 characters"
-                                        return@Button
-                                    }
-                                    viewModel.resetPassword(forgotEmailState.trim(), forgotOtpState.trim(), forgotNewPassState.trim()) { success ->
-                                        if (success) {
-                                            showForgotDialog = false
-                                            viewModel.errorMessage = "Password reset successfully. You can now login with your new password."
-                                        } else {
-                                            forgotErrorState = "Failed to reset password. Check OTP."
-                                        }
-                                    }
-                                }
-                            }
-                        ) {
-                            Text(text = if (forgotStepState == 1) "Send OTP" else "Reset Password")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showForgotDialog = false }) {
-                            Text(text = "Cancel")
-                        }
-                    }
-                )
             }
         }
     }
@@ -878,8 +772,6 @@ fun SignUpScreen(viewModel: AppViewModel) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -899,14 +791,25 @@ fun SignUpScreen(viewModel: AppViewModel) {
                     onClick = {
                         focusManager.clearFocus()
                         keyboardController?.hide()
-                        if (firstName.trim().isEmpty() || email.trim().isEmpty() || phone.trim().isEmpty() || password.trim().isEmpty()) {
+                        val cleanEmail = email.trim()
+                        val cleanPhone = phone.trim().replace(Regex("[\\s\\-]"), "")
+                        val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(cleanEmail).matches()
+                        val isPhoneValid = cleanPhone.matches(Regex("^((\\+923|923|03)\\d{9})$"))
+
+                        if (firstName.trim().isEmpty() || lastName.trim().isEmpty() || cleanEmail.isEmpty() || cleanPhone.isEmpty() || password.isEmpty()) {
                             viewModel.errorMessage = "Please fill all required fields"
+                        } else if (!isEmailValid) {
+                            viewModel.errorMessage = "Please enter a valid email address"
+                        } else if (!isPhoneValid) {
+                            viewModel.errorMessage = "Please enter a valid Pakistani mobile number (e.g. 03001234567)"
+                        } else if (password.length < 8) {
+                            viewModel.errorMessage = "Password must be at least 8 characters"
                         } else if (password != confirmPassword) {
                             viewModel.errorMessage = "Passwords do not match"
                         } else if (!acceptTerms) {
                             viewModel.errorMessage = "You must accept the Terms and Conditions"
                         } else {
-                            viewModel.submitSignUp(firstName.trim(), lastName.trim(), email.trim(), phone.trim(), password.trim()) { }
+                            viewModel.submitSignUp(firstName.trim(), lastName.trim(), cleanEmail, cleanPhone, password) { }
                         }
                     },
                     modifier = Modifier
@@ -1245,7 +1148,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
             )
             DrawerItem(
                 icon = Icons.Default.SelfImprovement,
-                title = "Weather & Namaz",
+                title = "Weather & Prayer Timings",
                 onClick = {
                     scope.launch { drawerState.close() }
                     viewModel.fetchWeatherAndNamaz("Lahore")
@@ -1374,7 +1277,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
             )
             DrawerItem(
                 icon = Icons.Default.Info,
-                title = "About App",
+                title = "About Us",
                 onClick = {
                     scope.launch { drawerState.close() }
                 }
@@ -1411,7 +1314,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Logout",
+                    text = "Log Out",
                     color = Color.Red,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
@@ -1745,7 +1648,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     }
                                 )
                                 QuickServiceItem(
-                                    label = "Freight Trains",
+                                    label = "Freight Services",
                                     icon = Icons.Default.LocalShipping,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
@@ -1800,7 +1703,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     }
                                 )
                                 QuickServiceItem(
-                                    label = "Namaz Timings",
+                                    label = "Prayer Timings",
                                     icon = Icons.Default.SelfImprovement,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
@@ -2129,7 +2032,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "NEXT NAMAZ",
+                            text = "NEXT PRAYER",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFF8D6E63),
@@ -2547,9 +2450,9 @@ fun LiveStatusScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("ETA: ${s.eta}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text("${s.distanceRemainingKm} KM remaining", fontSize = 12.sp, color = Color.Gray)
-                                Text("ETD: ${s.etd}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("Estimated Arrival: ${s.eta}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("${s.distanceRemainingKm} KM remaining", fontSize = 11.sp, color = Color.Gray)
+                                Text("Estimated Departure: ${s.etd}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -3080,16 +2983,36 @@ fun NewsBlogsScreen(viewModel: AppViewModel) {
     }
 }
 
-// --- 13. Weather & Namaz Screen ---
+// --- 13. Weather & Prayer Timings Screen ---
 @Composable
 fun NamazTimingsScreen(viewModel: AppViewModel) {
     val lang = viewModel.currentLanguage
+    val context = androidx.compose.ui.platform.LocalContext.current
     val weather = viewModel.weatherData
-    val namaz = viewModel.namazTimings
-    val cities = listOf("Lahore", "Karachi", "Rawalpindi", "Peshawar", "Multan", "Quetta")
+    val prayerData = viewModel.prayerTimesData
+    val settings = viewModel.prayerSettings
+    val countdownText = viewModel.prayerCountdownText
+    val cities = listOf("Lahore", "Karachi", "Rawalpindi", "Islamabad", "Peshawar", "Multan", "Quetta", "Faisalabad", "Sialkot", "Hyderabad", "Sukkur")
+
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { AppTopBar(title = "Local Weather & Namaz", lang = lang, onBack = { viewModel.goBack() }) }
+        topBar = {
+            AppTopBar(
+                title = com.example.ui.common.Localization.getText("prayer_timings", lang),
+                lang = lang,
+                onBack = { viewModel.goBack() },
+                actions = {
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Prayer Settings",
+                            tint = Color.White
+                        )
+                    }
+                }
+            )
+        }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(
@@ -3099,110 +3022,224 @@ fun NamazTimingsScreen(viewModel: AppViewModel) {
                     .padding(16.dp)
             ) {
                 // City selector row
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     items(cities) { city ->
                         FilterChip(
                             selected = viewModel.currentCity == city,
                             onClick = { viewModel.fetchWeatherAndNamaz(city) },
-                            label = { Text(city) }
+                            label = { Text(city, fontSize = 12.sp) },
+                            leadingIcon = if (viewModel.currentCity == city) {
+                                { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Weather card
-                weather?.let { w ->
+                // Hero Card: Next Prayer & Countdown Timer
+                prayerData?.let { p ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        elevation = CardDefaults.cardElevation(2.dp)
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F7A3E)),
+                        elevation = CardDefaults.cardElevation(4.dp)
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(18.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = Color(0xFFA7F3D0),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "WEATHER AT ${w.location.uppercase()}",
+                                    text = com.example.ui.common.Localization.getText("next_prayer", lang).uppercase(),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF64748B),
-                                    letterSpacing = 0.5.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = w.condition,
-                                    fontSize = 15.sp,
-                                    color = Color(0xFF0F7A3E),
-                                    fontWeight = FontWeight.Bold
+                                    color = Color(0xFFA7F3D0),
+                                    letterSpacing = 1.sp
                                 )
                             }
-                            Column(horizontalAlignment = Alignment.End) {
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = com.example.ui.common.Localization.getText(p.nextPrayerName.lowercase(), lang),
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+
+                            Text(
+                                text = "at ${p.nextPrayerFormattedTime}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFE2E8F0)
+                            )
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Countdown Badge Box
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = com.example.ui.common.Localization.getText("starts_in", lang),
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFD1FAE5)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = countdownText,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White,
+                                        letterSpacing = 1.5.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Date & Location Info Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = p.locationName,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 16.sp,
+                                        color = Color(0xFF0F172A)
+                                    )
+                                    Text(
+                                        text = p.gregorianDate,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF64748B)
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFFF1F5F9)
+                                ) {
+                                    Text(
+                                        text = p.hijriDate,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F7A3E),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF1F5F9))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Explore,
+                                        contentDescription = "Qibla",
+                                        tint = Color(0xFF0284C7),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Qibla: ${p.qiblaDirection}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF334155)
+                                    )
+                                }
                                 Text(
-                                    text = w.temperature,
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color(0xFF0F172A)
-                                )
-                                Text(
-                                    text = "Humidity: ${w.humidity}",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF64748B)
+                                    text = "${settings.method.name} • ${settings.school.name}",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF94A3B8)
                                 )
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                // Namaz Timings card
-                namaz?.let { n ->
                     Text(
-                        text = "ISLAMIC INFORMATION",
+                        text = com.example.ui.common.Localization.getText("prayer_timings", lang).uppercase(),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF64748B),
                         letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Hijri Date: ${n.islamicDate}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = Color(0xFF0F172A)
-                    )
-                    Text(
-                        text = "Qibla Direction: ${n.qiblaDirection}",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B)
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Prayer Items List
+                    p.items.forEach { item ->
+                        val translatedName = com.example.ui.common.Localization.getText(item.name.lowercase(), lang)
+                        val isCurrent = item.isCurrent
+                        val isNext = item.isNext
 
-                    val timingList = listOf(
-                        "Fajr" to n.fajr,
-                        "Dhuhr" to n.dhuhr,
-                        "Asr" to n.asr,
-                        "Maghrib" to n.maghrib,
-                        "Isha" to n.isha
-                    )
+                        val cardBg = when {
+                            isCurrent -> Color(0xFFDCFCE7)
+                            isNext -> Color(0xFFFEF3C7)
+                            else -> Color.White
+                        }
+                        val borderColor = when {
+                            isCurrent -> Color(0xFF16A34A)
+                            isNext -> Color(0xFFD97706)
+                            else -> Color(0xFFE2E8F0)
+                        }
 
-                    timingList.forEach { (name, time) ->
+                        val pIcon = when (item.name.lowercase()) {
+                            "fajr" -> Icons.Default.WbTwilight
+                            "sunrise" -> Icons.Default.WbSunny
+                            "dhuhr" -> Icons.Default.WbSunny
+                            "asr" -> Icons.Default.WbSunny
+                            "maghrib" -> Icons.Default.NightsStay
+                            "isha" -> Icons.Default.NightsStay
+                            else -> Icons.Default.Schedule
+                        }
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                            elevation = CardDefaults.cardElevation(1.dp)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = cardBg),
+                            border = BorderStroke(if (isCurrent || isNext) 1.5.dp else 1.dp, borderColor),
+                            elevation = CardDefaults.cardElevation(if (isCurrent || isNext) 2.dp else 1.dp)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -3211,19 +3248,87 @@ fun NamazTimingsScreen(viewModel: AppViewModel) {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = pIcon,
+                                        contentDescription = item.name,
+                                        tint = if (isCurrent) Color(0xFF15803D) else if (isNext) Color(0xFFB45309) else Color(0xFF64748B),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = translatedName,
+                                            fontWeight = if (isCurrent || isNext) FontWeight.ExtraBold else FontWeight.Bold,
+                                            color = if (isCurrent) Color(0xFF14532D) else if (isNext) Color(0xFF78350F) else Color(0xFF334155),
+                                            fontSize = 15.sp
+                                        )
+                                        if (isCurrent) {
+                                            Text(
+                                                text = "✓ ${com.example.ui.common.Localization.getText("current_prayer", lang)}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF15803D)
+                                            )
+                                        } else if (isNext) {
+                                            Text(
+                                                text = "➜ ${com.example.ui.common.Localization.getText("next_prayer", lang)}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFB45309)
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Text(
-                                    text = name,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF334155),
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = time,
-                                    color = Color(0xFF0F7A3E),
+                                    text = item.timeFormatted,
+                                    color = if (isCurrent) Color(0xFF15803D) else if (isNext) Color(0xFFB45309) else Color(0xFF0F7A3E),
                                     fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 14.sp
+                                    fontSize = 15.sp
                                 )
                             }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Weather card summary if available
+                weather?.let { w ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "WEATHER IN ${w.location.uppercase()}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF64748B)
+                                )
+                                Text(
+                                    text = w.condition,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF0F7A3E),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = w.temperature,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF0F172A)
+                            )
                         }
                     }
                 }
@@ -3233,6 +3338,102 @@ fun NamazTimingsScreen(viewModel: AppViewModel) {
                 LoadingOverlay(lang)
             }
         }
+    }
+
+    // Prayer Settings Dialog
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("Prayer Timing Settings", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Calculation Method:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    com.example.util.CalculationMethod.values().forEach { method ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.updatePrayerSettings(method = method, context = context)
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = settings.method == method,
+                                onClick = { viewModel.updatePrayerSettings(method = method, context = context) }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(method.displayName, fontSize = 12.sp)
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Text("Asr School:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    com.example.util.AsrSchool.values().forEach { school ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.updatePrayerSettings(school = school, context = context)
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = settings.school == school,
+                                onClick = { viewModel.updatePrayerSettings(school = school, context = context) }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(school.displayName, fontSize = 12.sp)
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Text("Time Format:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    com.example.util.TimeFormat.values().forEach { format ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.updatePrayerSettings(timeFormat = format, context = context)
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = settings.timeFormat == format,
+                                onClick = { viewModel.updatePrayerSettings(timeFormat = format, context = context) }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(format.displayName, fontSize = 12.sp)
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Prayer Notifications:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Switch(
+                            checked = settings.notificationsEnabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.updatePrayerSettings(notificationsEnabled = enabled, context = context)
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettingsDialog = false }) {
+                    Text("Done", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 }
 
@@ -3514,7 +3715,7 @@ fun ProfileScreen(viewModel: AppViewModel) {
                     Spacer(modifier = Modifier.height(24.dp))
 
                     TextButton(onClick = { viewModel.logout() }) {
-                        Text("Log Out Account", color = Color.Red, fontWeight = FontWeight.Bold)
+                        Text("Log Out", color = Color.Red, fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -3619,7 +3820,7 @@ fun ProfileScreen(viewModel: AppViewModel) {
                                     oldPass = ""
                                     newPass = ""
                                 } else {
-                                    viewModel.errorMessage = "Incorrect old password"
+                                    viewModel.errorMessage = "Incorrect old password."
                                 }
                             }
                         },

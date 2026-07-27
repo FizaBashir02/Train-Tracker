@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed class Screen {
@@ -127,6 +128,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var isLoading by mutableStateOf(false)
         private set
     var errorMessage by mutableStateOf<String?>(null)
+    var successMessage by mutableStateOf<String?>(null)
 
     // Train search
     var searchSource by mutableStateOf("")
@@ -156,8 +158,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var currentCity by mutableStateOf("Lahore")
     var weatherData by mutableStateOf<WeatherData?>(null)
     var namazTimings by mutableStateOf<NamazTimingsData?>(null)
+    var prayerTimesData by mutableStateOf<com.example.util.PrayerTimesData?>(null)
+    var prayerSettings by mutableStateOf(com.example.util.PrayerTimingSettings())
+    var prayerCountdownText by mutableStateOf("00:00:00")
 
     init {
+        startPrayerTicker()
         // Hydrate default notifications
         viewModelScope.launch {
             repository.notifications.collect { list ->
@@ -186,6 +192,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val success = repository.login(emailOrPhone, passwordRaw)
                 isLoading = false
                 if (success) {
+                    successMessage = null
                     navigateAndClear(Screen.Home)
                 } else {
                     errorMessage = "Invalid email/phone or password"
@@ -213,59 +220,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val success = repository.signUp(firstName, lastName, email, phone, passwordRaw)
                 isLoading = false
                 if (success) {
-                    tempSignUpData = SignUpData(firstName, lastName, email, phone, passwordRaw)
-                    navigateTo(Screen.Verification)
+                    successMessage = "Account created successfully. Please login."
+                    errorMessage = null
+                    navigateAndClear(Screen.Login)
                     onResult(true)
                 } else {
                     errorMessage = "Account already exists or registration failed. Please try again."
-                    onResult(false)
-                }
-            } catch (e: Exception) {
-                isLoading = false
-                errorMessage = com.example.data.service.ApiClient.parseError(e)
-                onResult(false)
-            }
-        }
-    }
-
-    fun forgotPassword(email: String, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            isLoading = true
-            errorMessage = null
-            try {
-                val success = repository.forgotPassword(email)
-                isLoading = false
-                if (success) {
-                    onResult(true)
-                } else {
-                    errorMessage = "Forgot password request failed. Account not found or service offline."
-                    onResult(false)
-                }
-            } catch (e: Exception) {
-                isLoading = false
-                errorMessage = com.example.data.service.ApiClient.parseError(e)
-                onResult(false)
-            }
-        }
-    }
-
-    fun resetPassword(email: String, otpCode: String, newPasswordRaw: String, onResult: (Boolean) -> Unit) {
-        val check = validatePassword(newPasswordRaw)
-        if (!check.first) {
-            errorMessage = check.second ?: "Invalid password"
-            onResult(false)
-            return
-        }
-        viewModelScope.launch {
-            isLoading = true
-            errorMessage = null
-            try {
-                val success = repository.resetPassword(email, otpCode, newPasswordRaw)
-                isLoading = false
-                if (success) {
-                    onResult(true)
-                } else {
-                    errorMessage = "Failed to reset password. Verify OTP code and try again."
                     onResult(false)
                 }
             } catch (e: Exception) {
@@ -441,6 +401,64 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun startPrayerTicker() {
+        viewModelScope.launch {
+            while (isActive) {
+                recalculatePrayerTimes()
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+    }
+
+    fun recalculatePrayerTimes() {
+        val coords = com.example.util.PrayerTimeCalculator.getCoordinatesForCity(currentCity)
+        val calculated = com.example.util.PrayerTimeCalculator.calculatePrayerTimes(
+            locationName = currentCity,
+            lat = coords.lat,
+            lng = coords.lng,
+            settings = prayerSettings
+        )
+        prayerTimesData = calculated
+
+        val totalSecs = calculated.countdownSeconds
+        val hrs = totalSecs / 3600
+        val mins = (totalSecs % 3600) / 60
+        val secs = totalSecs % 60
+        prayerCountdownText = String.format(java.util.Locale.ENGLISH, "%02d:%02d:%02d", hrs, mins, secs)
+
+        namazTimings = NamazTimingsData(
+            islamicDate = calculated.hijriDate,
+            fajr = calculated.fajr,
+            sunrise = calculated.sunrise,
+            dhuhr = calculated.dhuhr,
+            asr = calculated.asr,
+            maghrib = calculated.maghrib,
+            isha = calculated.isha,
+            qiblaDirection = calculated.qiblaDirection
+        )
+    }
+
+    fun updatePrayerSettings(
+        method: com.example.util.CalculationMethod = prayerSettings.method,
+        school: com.example.util.AsrSchool = prayerSettings.school,
+        timeFormat: com.example.util.TimeFormat = prayerSettings.timeFormat,
+        notificationsEnabled: Boolean = prayerSettings.notificationsEnabled,
+        context: android.content.Context? = null
+    ) {
+        prayerSettings = com.example.util.PrayerTimingSettings(method, school, timeFormat, notificationsEnabled)
+        recalculatePrayerTimes()
+
+        context?.let { ctx ->
+            if (notificationsEnabled) {
+                prayerTimesData?.let { data ->
+                    com.example.data.service.PrayerNotificationManager.schedulePrayerNotifications(ctx, data.items, currentCity)
+                }
+            } else {
+                com.example.data.service.PrayerNotificationManager.cancelAllPrayerNotifications(ctx)
+            }
+        }
+    }
+
     fun fetchWeatherAndNamaz(city: String = currentCity) {
         viewModelScope.launch {
             isLoading = true
@@ -448,7 +466,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             errorMessage = null
             try {
                 weatherData = repository.getWeatherApi(city)
-                namazTimings = repository.getNamazTimingsApi(city)
+                recalculatePrayerTimes()
             } catch (e: Exception) {
                 errorMessage = "Failed to load localized info: ${e.localizedMessage}"
             } finally {

@@ -84,7 +84,20 @@ object Localization {
             "quick_services" to "Quick Services",
             "retry" to "Retry",
             "error_occurred" to "An error occurred",
-            "no_internet" to "No Internet Connection"
+            "no_internet" to "No Internet Connection",
+            "fajr" to "Fajr",
+            "sunrise" to "Sunrise",
+            "dhuhr" to "Dhuhr",
+            "asr" to "Asr",
+            "maghrib" to "Maghrib",
+            "isha" to "Isha",
+            "next_prayer" to "Next Prayer",
+            "current_prayer" to "Current Prayer",
+            "starts_in" to "Starts in",
+            "calculation_method" to "Calculation Method",
+            "asr_method" to "Asr Method",
+            "time_format" to "Time Format",
+            "prayer_notifications" to "Prayer Notifications"
         ),
         "ur" to mapOf(
             "app_name" to "ٹرین ٹریکر",
@@ -168,7 +181,20 @@ object Localization {
             "quick_services" to "فوری خدمات",
             "retry" to "دوبارہ کوشش کریں",
             "error_occurred" to "ایک غلطی پیش آگئی",
-            "no_internet" to "انٹرنیٹ کنکشن موجود نہیں ہے"
+            "no_internet" to "انٹرنیٹ کنکشن موجود نہیں ہے",
+            "fajr" to "فجر",
+            "sunrise" to "طلوع آفتاب",
+            "dhuhr" to "ظہر",
+            "asr" to "عصر",
+            "maghrib" to "مغرب",
+            "isha" to "عشاء",
+            "next_prayer" to "اگلی نماز",
+            "current_prayer" to "موجودہ نماز",
+            "starts_in" to "شروع ہونے میں باقی",
+            "calculation_method" to "طریقہ حساب",
+            "asr_method" to "فقہ عصر",
+            "time_format" to "وقت کا فارمیٹ",
+            "prayer_notifications" to "نماز کے نوٹیفیکیشنز"
         )
     )
 
