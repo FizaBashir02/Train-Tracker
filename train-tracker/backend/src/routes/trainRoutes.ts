@@ -1,9 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { 
   searchTrains, 
+  getTrainById,
   getTrainSchedule, 
-  getStationInfo, 
-  getLiveStatus, 
+  getStations, 
+  getStationById,
+  getRoutes,
+  getRouteById,
   getFreightTrains, 
   getWeather, 
   getPrayerTimes, 
@@ -32,14 +35,16 @@ const safeAsync = (fn: (req: Request, res: Response, next: NextFunction) => Prom
   };
 };
 
+// Train Schedule Endpoints
 router.get('/', safeAsync(searchTrains));
 router.get('/search', safeAsync(searchTrains));
-router.get('/schedule/:trainNumber', safeAsync(getTrainSchedule));
-router.get('/:trainNumber/schedule', safeAsync(getTrainSchedule));
-router.get('/station/:stationCode', safeAsync(getStationInfo));
-router.get('/live-status/:trainNumber', safeAsync(getLiveStatus));
-router.get('/:trainNumber/live-status', safeAsync(getLiveStatus));
 router.get('/freight', safeAsync(getFreightTrains));
+router.get('/schedule', safeAsync(getTrainSchedule));
+router.get('/schedule/:trainNumber', safeAsync(getTrainSchedule));
+router.get('/:id/schedule', safeAsync(getTrainSchedule));
+router.get('/:id', safeAsync(getTrainById));
+
+// Utility Endpoints
 router.get('/weather', safeAsync(getWeather));
 router.get('/prayer', safeAsync(getPrayerTimes));
 router.get('/prayers', safeAsync(getPrayerTimes));

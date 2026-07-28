@@ -25,9 +25,10 @@ sealed class Screen {
     object Verification : Screen()
     object Home : Screen()
     object TrainSearch : Screen()
-    object LiveStatus : Screen()
     object TrainScheduleScreen : Screen()
+    object TrainDetailScreen : Screen()
     object StationInfoScreen : Screen()
+    object RouteScreen : Screen()
     object FreightTrainsScreen : Screen()
     object NewsBlogsScreen : Screen()
     object NamazTimingsScreen : Screen()
@@ -130,25 +131,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var errorMessage by mutableStateOf<String?>(null)
     var successMessage by mutableStateOf<String?>(null)
 
-    // Train search
-    var searchSource by mutableStateOf("")
-    var searchDest by mutableStateOf("")
-    var searchTypeFilter by mutableStateOf("All") // "All", "Express", "Passenger"
-    var searchResults by mutableStateOf<List<TrainSearchItem>>(emptyList())
+    // Train search & Train Schedule Module
+    var filterOptions by mutableStateOf(FilterOptions())
+    var trainsList by mutableStateOf<List<TrainScheduleItem>>(emptyList())
+    var selectedTrain by mutableStateOf<TrainScheduleItem?>(null)
 
-    // Live status
-    var liveStatusQuery by mutableStateOf("")
-    var activeLiveStatus by mutableStateOf<LiveStatus?>(null)
-
-    // Train Schedule
-    var activeTrainSchedule by mutableStateOf<TrainSchedule?>(null)
-
-    // Station Info
+    // Stations
     var stationQuery by mutableStateOf("")
-    var activeStationInfo by mutableStateOf<StationInfo?>(null)
+    var stationsList by mutableStateOf<List<StationItem>>(emptyList())
+    var selectedStation by mutableStateOf<StationItem?>(null)
+
+    // Routes
+    var routesList by mutableStateOf<List<RouteItem>>(emptyList())
+    var selectedRoute by mutableStateOf<RouteItem?>(null)
 
     // Freight Trains
-    var freightTrainsList by mutableStateOf<List<FreightTrainItem>>(emptyList())
+    var freightTrainsList by mutableStateOf<List<TrainScheduleItem>>(emptyList())
 
     // News and Blogs
     var newsList by mutableStateOf<List<NewsItem>>(emptyList())
@@ -310,62 +308,90 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Search & Fetch APIs via Gemini/Fallback ---
-    fun runTrainSearch() {
+    // --- Train Schedule Module Actions ---
+    fun loadTrainsSchedule(options: FilterOptions = filterOptions) {
+        filterOptions = options
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             try {
-                searchResults = repository.searchTrainsApi(searchSource, searchDest, searchTypeFilter)
+                trainsList = repository.getAllTrainsSchedule(options)
             } catch (e: Exception) {
-                errorMessage = "Search failed: ${e.localizedMessage}"
+                errorMessage = "Failed to load schedules: ${e.localizedMessage}"
             } finally {
                 isLoading = false
             }
         }
     }
 
-    fun fetchLiveStatus(trainNumber: String) {
+    fun selectTrainDetails(trainIdOrNum: String) {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
-            liveStatusQuery = trainNumber
             try {
-                activeLiveStatus = repository.getLiveStatusApi(trainNumber)
-                navigateTo(Screen.LiveStatus)
+                selectedTrain = repository.getTrainDetails(trainIdOrNum)
+                navigateTo(Screen.TrainDetailScreen)
             } catch (e: Exception) {
-                errorMessage = "Failed to load live status: ${e.localizedMessage}"
+                errorMessage = "Failed to load train details: ${e.localizedMessage}"
             } finally {
                 isLoading = false
             }
         }
     }
 
-    fun fetchTrainSchedule(trainNumber: String) {
+    fun loadStations(query: String = stationQuery) {
+        stationQuery = query
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             try {
-                activeTrainSchedule = repository.getTrainScheduleApi(trainNumber)
-                navigateTo(Screen.TrainScheduleScreen)
+                stationsList = repository.getStationsList(query)
             } catch (e: Exception) {
-                errorMessage = "Failed to load schedule: ${e.localizedMessage}"
+                errorMessage = "Failed to load stations: ${e.localizedMessage}"
             } finally {
                 isLoading = false
             }
         }
     }
 
-    fun fetchStationInfo(stationCode: String) {
+    fun selectStationDetails(code: String) {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
-            stationQuery = stationCode
             try {
-                activeStationInfo = repository.getStationInfoApi(stationCode)
+                selectedStation = repository.getStationDetails(code)
                 navigateTo(Screen.StationInfoScreen)
             } catch (e: Exception) {
-                errorMessage = "Failed to load station info: ${e.localizedMessage}"
+                errorMessage = "Failed to load station details: ${e.localizedMessage}"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun loadRoutes() {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            try {
+                routesList = repository.getRoutesList()
+            } catch (e: Exception) {
+                errorMessage = "Failed to load routes: ${e.localizedMessage}"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun selectRouteDetails(routeId: String) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            try {
+                selectedRoute = repository.getRouteDetails(routeId)
+                navigateTo(Screen.RouteScreen)
+            } catch (e: Exception) {
+                errorMessage = "Failed to load route details: ${e.localizedMessage}"
             } finally {
                 isLoading = false
             }

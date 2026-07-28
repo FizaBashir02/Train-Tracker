@@ -1,5 +1,6 @@
 package com.example.data.service
 
+import com.example.data.model.*
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
@@ -97,24 +98,43 @@ interface ApiService {
     @POST("auth/register-fcm-token")
     suspend fun registerFcmToken(@Body request: FcmTokenRequest): ApiGenericResponse
 
+    @GET("trains")
+    suspend fun getAllTrains(
+        @Query("name") name: String? = null,
+        @Query("number") number: String? = null,
+        @Query("source") source: String? = null,
+        @Query("destination") destination: String? = null,
+        @Query("status") status: String? = null,
+        @Query("type") type: String? = null
+    ): List<TrainScheduleItem>
+
     @GET("trains/search")
     suspend fun searchTrains(
-        @Query("source") source: String,
-        @Query("destination") destination: String,
-        @Query("type") type: String
-    ): List<TrainSearchItem>
+        @Query("source") source: String = "",
+        @Query("destination") destination: String = "",
+        @Query("type") type: String = "All"
+    ): List<TrainScheduleItem>
 
-    @GET("trains/{number}/live-status")
-    suspend fun getLiveStatus(@Path("number") trainNumber: String): LiveStatus
+    @GET("trains/{id}")
+    suspend fun getTrainDetails(@Path("id") trainId: String): TrainScheduleItem
 
     @GET("trains/{number}/schedule")
-    suspend fun getTrainSchedule(@Path("number") trainNumber: String): TrainSchedule
+    suspend fun getTrainSchedule(@Path("number") trainNumber: String): TrainScheduleItem
 
-    @GET("trains/station/{code}")
-    suspend fun getStationInfo(@Path("code") stationCode: String): StationInfo
+    @GET("stations")
+    suspend fun getStations(@Query("search") search: String? = null): List<StationItem>
+
+    @GET("stations/{id}")
+    suspend fun getStationDetails(@Path("id") stationId: String): StationItem
+
+    @GET("routes")
+    suspend fun getRoutes(): List<RouteItem>
+
+    @GET("routes/{id}")
+    suspend fun getRouteDetails(@Path("id") routeId: String): RouteItem
 
     @GET("trains/freight")
-    suspend fun getFreightTrains(): List<FreightTrainItem>
+    suspend fun getFreightTrains(): List<TrainScheduleItem>
 
     @GET("trains/weather")
     suspend fun getWeather(@Query("location") location: String): WeatherData

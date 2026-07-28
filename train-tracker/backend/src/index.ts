@@ -200,6 +200,8 @@ app.use('/api/auth/verify-otp', authLimiter);
 // Safely load and register routes in try/catch blocks
 let authRoutes: any;
 let trainRoutes: any;
+let stationRoutes: any;
+let routeRoutes: any;
 let userRoutes: any;
 let adminRoutes: any;
 
@@ -213,6 +215,18 @@ try {
   trainRoutes = require('./routes/trainRoutes').default;
 } catch (err: any) {
   logger.error(`Failed to load trainRoutes: ${err?.message || err}`);
+}
+
+try {
+  stationRoutes = require('./routes/stationRoutes').default;
+} catch (err: any) {
+  logger.error(`Failed to load stationRoutes: ${err?.message || err}`);
+}
+
+try {
+  routeRoutes = require('./routes/routeRoutes').default;
+} catch (err: any) {
+  logger.error(`Failed to load routeRoutes: ${err?.message || err}`);
 }
 
 try {
@@ -233,13 +247,19 @@ if (authRoutes) {
 
 if (trainRoutes) {
   app.use('/api/trains', trainRoutes);
-  app.use('/api/stations', trainRoutes);
-  app.use('/api/tracking', trainRoutes);
   app.use('/api/weather', trainRoutes);
   app.use('/api/prayers', trainRoutes);
   app.use('/api/news', trainRoutes);
   app.use('/api/blogs', trainRoutes);
   app.use('/api/notifications', trainRoutes);
+}
+
+if (stationRoutes) {
+  app.use('/api/stations', stationRoutes);
+}
+
+if (routeRoutes) {
+  app.use('/api/routes', routeRoutes);
 }
 
 if (userRoutes) {
@@ -274,6 +294,12 @@ mongoose.connection.on('connected', () => {
   syncMongoIndexes().catch((err) => {
     logger.warn(`[MONGODB] Background index sync error: ${err?.message || err}`);
   });
+  try {
+    const { seedDatabase } = require('./seed/seedData');
+    seedDatabase();
+  } catch (seedErr) {
+    console.error('[SEED] Could not load seed script:', seedErr);
+  }
 });
 
 mongoose.connection.on('error', (err) => {

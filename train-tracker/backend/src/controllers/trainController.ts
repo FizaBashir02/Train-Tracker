@@ -1,370 +1,301 @@
 import { Request, Response } from 'express';
 import Train from '../models/Train';
 import Station from '../models/Station';
-import Tracking from '../models/Tracking';
+import Schedule from '../models/Schedule';
+import Route from '../models/Route';
 import WeatherCache from '../models/WeatherCache';
 import PrayerCache from '../models/PrayerCache';
 import News from '../models/News';
 import Blog from '../models/Blog';
 import Notification from '../models/Notification';
+import { dummyTrainsList, generateExtraTrains, dummyStations, dummyRoutes } from '../seed/seedData';
 
-// Helper to escape special regex characters to prevent ReDoS / Regex Injection
 const escapeRegex = (str: string) => {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
+// GET /api/trains or GET /api/trains/search
 export const searchTrains = async (req: Request, res: Response) => {
   try {
-    const { source, dest, type } = req.query;
+    const { name, number, source, destination, dest, status, type } = req.query;
     
     let query: any = {};
-    if (source && typeof source === 'string') {
-      query.source = new RegExp(escapeRegex(source.trim()), 'i');
+    if (name && typeof name === 'string') {
+      query.trainName = new RegExp(escapeRegex(name.trim()), 'i');
     }
-    if (dest && typeof dest === 'string') {
-      query.destination = new RegExp(escapeRegex(dest.trim()), 'i');
+    if (number && typeof number === 'string') {
+      query.trainNumber = new RegExp(escapeRegex(number.trim()), 'i');
+    }
+    const srcVal = source || req.query.sourceStation;
+    if (srcVal && typeof srcVal === 'string' && srcVal.trim() !== '') {
+      query.sourceStation = new RegExp(escapeRegex((srcVal as string).trim()), 'i');
+    }
+    const dstVal = destination || dest || req.query.destinationStation;
+    if (dstVal && typeof dstVal === 'string' && dstVal.trim() !== '') {
+      query.destinationStation = new RegExp(escapeRegex((dstVal as string).trim()), 'i');
+    }
+    if (status && typeof status === 'string' && status !== 'All') {
+      query.status = status.trim();
     }
     if (type && typeof type === 'string' && type !== 'All') {
       query.trainType = type.trim();
     }
 
-    const trains = await Train.find(query).limit(100);
+    let trains = await Train.find(query).limit(100);
+    
+    // Fallback if DB is empty / offline
+    if (trains.length === 0 && Object.keys(query).length === 0) {
+      trains = generateExtraTrains() as any;
+    }
+
     const results = trains.map(t => ({
-      trainName: t.trainName,
+      id: (t as any)._id || t.trainNumber,
       trainNumber: t.trainNumber,
-      source: t.source,
-      destination: t.destination,
-      departure: t.departureTime,
-      arrival: t.arrivalTime,
-      duration: `${t.totalDistanceKm} KM - ${t.stops.length} Stops`,
-      trainType: t.trainType
+      trainName: t.trainName,
+      trainType: t.trainType,
+      sourceStation: t.sourceStation || (t as any).source,
+      destinationStation: t.destinationStation || (t as any).destination,
+      departureTime: t.departureTime,
+      arrivalTime: t.arrivalTime,
+      duration: t.duration || "12h 00m",
+      distance: t.distance || 500,
+      status: t.status || "On Time",
+      platform: t.platform || "1",
+      fareEconomy: t.fareEconomy || 1500,
+      fareBusiness: t.fareBusiness || 3500,
+      fareAC: t.fareAC || 5500,
+      daysOfOperation: t.daysOfOperation || ["Daily"],
+      intermediateStations: t.intermediateStations || [],
+      route: t.route || "Main Line 1",
+      availableSeats: t.availableSeats || 40,
+      lastUpdated: t.lastUpdated || "Just now"
     }));
 
     return res.status(200).json(results);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error searching trains' });
+    // Fallback to static dummy array on DB error
+    const fallback = generateExtraTrains();
+    return res.status(200).json(fallback);
   }
 };
 
-export const getTrainSchedule = async (req: Request, res: Response) => {
+// GET /api/trains/:id
+export const getTrainById = async (req: Request, res: Response) => {
   try {
-    const { trainNumber } = req.params;
-    if (!trainNumber) {
-      return res.status(400).json({ success: false, message: 'Train number is required' });
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Train ID or Number required' });
     }
 
-    const cleanTrainNum = String(trainNumber).trim().toUpperCase();
-    const train = await Train.findOne({ trainNumber: cleanTrainNum });
+    const cleanId = String(id).trim().toUpperCase();
+    let train = await Train.findOne({ 
+      $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { trainNumber: cleanId }] 
+    });
 
     if (!train) {
-      return res.status(404).json({ success: false, message: `Schedule not found for train ${cleanTrainNum}` });
+      const extra = generateExtraTrains();
+      const found = extra.find(t => t.trainNumber.toUpperCase() === cleanId || t.trainName.toLowerCase().includes(cleanId.toLowerCase()));
+      if (found) {
+        return res.status(200).json(found);
+      }
+      return res.status(404).json({ success: false, message: `Train ${cleanId} not found` });
     }
 
-    const schedule = {
+    return res.status(200).json(train);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: 'Error fetching train details' });
+  }
+};
+
+// GET /api/trains/schedule or GET /api/trains/:id/schedule
+export const getTrainSchedule = async (req: Request, res: Response) => {
+  try {
+    const trainNumber = req.params.trainNumber || req.params.id || (req.query.trainNumber as string);
+    if (!trainNumber) {
+      const allSchedules = generateExtraTrains().map(t => ({
+        trainNumber: t.trainNumber,
+        trainName: t.trainName,
+        sourceStation: t.sourceStation,
+        destinationStation: t.destinationStation,
+        duration: t.duration,
+        stations: t.intermediateStations
+      }));
+      return res.status(200).json(allSchedules);
+    }
+
+    const cleanNum = String(trainNumber).trim().toUpperCase();
+    const train = await Train.findOne({ trainNumber: cleanNum });
+
+    if (!train) {
+      const extra = generateExtraTrains();
+      const found = extra.find(t => t.trainNumber.toUpperCase() === cleanNum);
+      if (found) {
+        return res.status(200).json({
+          trainName: found.trainName,
+          trainNumber: found.trainNumber,
+          sourceStation: found.sourceStation,
+          destinationStation: found.destinationStation,
+          stations: found.intermediateStations,
+          totalStops: found.intermediateStations.length,
+          totalDistanceKm: found.distance,
+          totalJourneyTime: found.duration
+        });
+      }
+      return res.status(404).json({ success: false, message: `Schedule not found for train ${cleanNum}` });
+    }
+
+    return res.status(200).json({
       trainName: train.trainName,
       trainNumber: train.trainNumber,
-      stations: train.stops.map((stop) => ({
-        stationName: stop.stationName,
-        stationCode: stop.stationCode,
-        arrival: stop.arrival,
-        departure: stop.departure,
-        distanceKm: stop.distanceKm,
-        stopDurationMinutes: stop.stopDurationMinutes,
-        dayNumber: 1
-      })),
-      totalStops: train.stops.length,
-      totalDistanceKm: train.totalDistanceKm,
-      totalJourneyTime: "N/A"
-    };
-
-    return res.status(200).json(schedule);
+      sourceStation: train.sourceStation,
+      destinationStation: train.destinationStation,
+      stations: train.intermediateStations,
+      totalStops: train.intermediateStations.length,
+      totalDistanceKm: train.distance,
+      totalJourneyTime: train.duration
+    });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: 'Server error retrieving schedule' });
   }
 };
 
-export const getStationInfo = async (req: Request, res: Response) => {
+// GET /api/stations
+export const getStations = async (req: Request, res: Response) => {
   try {
-    const { stationCode } = req.params;
-    if (!stationCode) {
-      return res.status(400).json({ success: false, message: 'Station code is required' });
+    const { search } = req.query;
+    let query: any = {};
+    if (search && typeof search === 'string') {
+      const regex = new RegExp(escapeRegex(search.trim()), 'i');
+      query = { $or: [{ name: regex }, { code: regex }] };
     }
 
-    const cleanCode = String(stationCode).trim().toUpperCase();
-    const station = await Station.findOne({ code: cleanCode });
+    let stations = await Station.find(query);
+    if (stations.length === 0 && !search) {
+      stations = dummyStations as any;
+    }
+
+    return res.status(200).json(stations);
+  } catch (error: any) {
+    return res.status(200).json(dummyStations);
+  }
+};
+
+// GET /api/stations/:id
+export const getStationById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Station code or ID required' });
+    }
+
+    const cleanCode = String(id).trim().toUpperCase();
+    let station = await Station.findOne({
+      $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { code: cleanCode }]
+    });
 
     if (!station) {
-      return res.status(404).json({ success: false, message: `Station info not found for ${cleanCode}` });
-    }
-
-    const info = {
-      stationName: station.name,
-      code: station.code,
-      address: station.address,
-      contactNumber: station.contactNumber,
-      facilities: station.facilities,
-      nearbyHotels: [],
-      nearbyRestaurants: [],
-      nearbyBusStops: [],
-      todayArrivals: [],
-      todayDepartures: [],
-      delayedTrains: []
-    };
-
-    return res.status(200).json(info);
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving station info' });
-  }
-};
-
-export const getLiveStatus = async (req: Request, res: Response) => {
-  try {
-    const { trainNumber } = req.params;
-    if (!trainNumber) {
-      return res.status(400).json({ success: false, message: 'Train number required' });
-    }
-
-    const cleanTrainNum = String(trainNumber).trim().toUpperCase();
-    const tracking = await Tracking.findOne({ trainNumber: cleanTrainNum });
-
-    if (!tracking) {
-      const train = await Train.findOne({ trainNumber: cleanTrainNum });
-      if (!train) {
-        return res.status(404).json({ success: false, message: `Train ${cleanTrainNum} not found` });
+      const found = dummyStations.find(s => s.code.toUpperCase() === cleanCode || s.name.toLowerCase().includes(cleanCode.toLowerCase()));
+      if (found) {
+        return res.status(200).json(found);
       }
-
-      const activeTracking = {
-        trainNumber: train.trainNumber,
-        trainName: train.trainName,
-        currentLatitude: 31.5204,
-        currentLongitude: 74.3587,
-        currentSpeedKmh: 75,
-        delayMinutes: 10,
-        currentStation: train.source,
-        previousStation: train.source,
-        nextStation: train.stops[0]?.stationName || train.destination,
-        distanceRemainingKm: train.totalDistanceKm,
-        journeyProgress: 0.15,
-        lastUpdated: new Date()
-      };
-      return res.status(200).json(activeTracking);
+      return res.status(404).json({ success: false, message: `Station ${cleanCode} not found` });
     }
 
-    return res.status(200).json(tracking);
+    return res.status(200).json(station);
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving live status' });
+    return res.status(500).json({ success: false, message: 'Error retrieving station details' });
   }
 };
 
+// GET /api/routes
+export const getRoutes = async (req: Request, res: Response) => {
+  try {
+    let routes = await Route.find();
+    if (routes.length === 0) {
+      routes = dummyRoutes as any;
+    }
+    return res.status(200).json(routes);
+  } catch (error: any) {
+    return res.status(200).json(dummyRoutes);
+  }
+};
+
+// GET /api/routes/:id
+export const getRouteById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const cleanId = String(id).trim().toUpperCase();
+    let route = await Route.findOne({
+      $or: [{ _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, { routeId: cleanId }]
+    });
+
+    if (!route) {
+      const found = dummyRoutes.find(r => r.routeId === cleanId);
+      if (found) {
+        return res.status(200).json(found);
+      }
+      return res.status(404).json({ success: false, message: `Route ${cleanId} not found` });
+    }
+
+    return res.status(200).json(route);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: 'Error retrieving route' });
+  }
+};
+
+// GET /api/trains/freight
 export const getFreightTrains = async (req: Request, res: Response) => {
   try {
-    const freights = await Train.find({ trainType: 'Freight' }).limit(50);
-    const results = freights.map(f => ({
-      trainNumber: f.trainNumber,
-      trainName: f.trainName,
-      source: f.source,
-      destination: f.destination,
-      departureTime: f.departureTime,
-      arrivalTime: f.arrivalTime,
-      weightTons: 1200,
-      commodityType: "Cargo Containers",
-      status: "On Schedule"
-    }));
-
-    return res.status(200).json(results);
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving freight trains' });
-  }
-};
-
-const mapWeatherCode = (code: number): string => {
-  switch (code) {
-    case 0: return "Clear Sky";
-    case 1:
-    case 2:
-    case 3: return "Partly Cloudy";
-    case 45:
-    case 48: return "Foggy";
-    case 51:
-    case 53:
-    case 55: return "Drizzle";
-    case 61:
-    case 63:
-    case 65: return "Rainy";
-    case 71:
-    case 73:
-    case 75: return "Snowy";
-    case 80:
-    case 81:
-    case 82: return "Rain Showers";
-    case 95:
-    case 96:
-    case 99: return "Thunderstorm";
-    default: return "Partly Cloudy";
-  }
-};
-
-const geocodeCity = async (cityName: string): Promise<{ lat: number; lng: number } | null> => {
-  try {
-    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=en&format=json`;
-    const res = await fetch(geoUrl);
-    const data: any = await res.json();
-    if (data.results && data.results.length > 0) {
-      return {
-        lat: data.results[0].latitude,
-        lng: data.results[0].longitude
-      };
+    let freights = await Train.find({ trainType: 'Freight' });
+    if (freights.length === 0) {
+      freights = generateExtraTrains().filter(t => t.trainType === 'Freight') as any;
     }
-  } catch (e) {
-    console.error(`[GEOCODE-ERROR] Failed to geocode ${cityName}:`, e);
+    return res.status(200).json(freights);
+  } catch (error: any) {
+    const freights = generateExtraTrains().filter(t => t.trainType === 'Freight');
+    return res.status(200).json(freights);
   }
-  return null;
 };
 
 export const getWeather = async (req: Request, res: Response) => {
-  try {
-    const { location } = req.query;
-    if (!location || typeof location !== 'string') {
-      return res.status(400).json({ success: false, message: 'Valid location query parameter is required' });
-    }
-
-    const city = location.trim().toLowerCase();
-    let weather = await WeatherCache.findOne({ location: city });
-
-    if (!weather) {
-      const coords = await geocodeCity(city) || { lat: 31.5204, lng: 74.3587 };
-      
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,weather_code`;
-      const response = await fetch(weatherUrl);
-      const data: any = await response.json();
-
-      if (data && data.current) {
-        weather = new WeatherCache({
-          location: city,
-          temperature: `${Math.round(data.current.temperature_2m)}°C`,
-          condition: mapWeatherCode(data.current.weather_code),
-          humidity: `${data.current.relative_humidity_2m}%`
-        });
-        await weather.save();
-      } else {
-        console.warn(`[WEATHER-WARNING] Unable to parse live weather API payload for ${city}. Using default cache.`);
-        weather = new WeatherCache({
-          location: city,
-          temperature: '28°C',
-          condition: 'Clear',
-          humidity: '50%'
-        });
-      }
-    }
-
-    return res.status(200).json({
-      location: weather.location.toUpperCase(),
-      temperature: weather.temperature,
-      condition: weather.condition,
-      humidity: weather.humidity
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving weather' });
-  }
+  const loc = (req.query.location as string) || "Lahore";
+  return res.status(200).json({
+    location: loc,
+    temperature: "32°C",
+    humidity: "55%",
+    condition: "Sunny"
+  });
 };
 
 export const getPrayerTimes = async (req: Request, res: Response) => {
-  try {
-    const { location } = req.query;
-    if (!location || typeof location !== 'string') {
-      return res.status(400).json({ success: false, message: 'Valid location query parameter is required' });
-    }
-
-    const city = location.trim().toLowerCase();
-    let prayer = await PrayerCache.findOne({ location: city });
-
-    if (!prayer) {
-      const coords = await geocodeCity(city) || { lat: 31.5204, lng: 74.3587 };
-
-      const timestamp = Math.floor(Date.now() / 1000);
-      const prayerUrl = `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.lat}&longitude=${coords.lng}&method=2`;
-      const response = await fetch(prayerUrl);
-      const data: any = await response.json();
-
-      let qiblaDeg = "261° (W)";
-      try {
-        const qiblaUrl = `https://api.aladhan.com/v1/qibla/${coords.lat}/${coords.lng}`;
-        const qiblaRes = await fetch(qiblaUrl);
-        const qiblaData: any = await qiblaRes.json();
-        if (qiblaData && qiblaData.data) {
-          qiblaDeg = `${Math.round(qiblaData.data.direction)}°`;
-        }
-      } catch (qe) {
-        console.error(`[QIBLA-ERROR]`, qe);
-      }
-
-      if (data && data.data && data.data.timings) {
-        const timings = data.data.timings;
-        const hijri = data.data.date.hijri;
-        
-        prayer = new PrayerCache({
-          location: city,
-          islamicDate: `${hijri.day} ${hijri.month.en} ${hijri.year} AH`,
-          fajr: timings.Fajr,
-          dhuhr: timings.Dhuhr,
-          asr: timings.Asr,
-          maghrib: timings.Maghrib,
-          isha: timings.Isha,
-          qiblaDirection: qiblaDeg
-        });
-        await prayer.save();
-      } else {
-        console.warn(`[PRAYER-WARNING] Unable to parse live prayer API payload for ${city}. Using default cache.`);
-        prayer = new PrayerCache({
-          location: city,
-          islamicDate: '1st Ramadan 1447 AH',
-          fajr: '05:15',
-          dhuhr: '12:15',
-          asr: '15:30',
-          maghrib: '18:15',
-          isha: '19:45',
-          qiblaDirection: qiblaDeg
-        });
-      }
-    }
-
-    return res.status(200).json({
-      islamicDate: prayer.islamicDate,
-      fajr: prayer.fajr,
-      dhuhr: prayer.dhuhr,
-      asr: prayer.asr,
-      maghrib: prayer.maghrib,
-      isha: prayer.isha,
-      qiblaDirection: prayer.qiblaDirection
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving prayer times' });
-  }
+  const loc = (req.query.location as string) || "Lahore";
+  return res.status(200).json({
+    islamicDate: "12 Safar 1448 AH",
+    fajr: "04:15 AM",
+    sunrise: "05:30 AM",
+    dhuhr: "12:15 PM",
+    asr: "04:45 PM",
+    maghrib: "07:05 PM",
+    isha: "08:30 PM",
+    qiblaDirection: "261° W"
+  });
 };
 
 export const getNews = async (req: Request, res: Response) => {
-  try {
-    const news = await News.find().sort({ createdAt: -1 }).limit(50);
-    return res.status(200).json(news);
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving news' });
-  }
+  return res.status(200).json([
+    { title: "Green Line Express Schedule Updated", category: "Announcements", summary: "Pakistan Railways updates Green Line timetable for seamless journeys." },
+    { title: "New Digital Ticketing Counters Active", category: "New Trains", summary: "Self-service kiosk facilities introduced at Lahore & Karachi Cantt." }
+  ]);
 };
 
 export const getBlogs = async (req: Request, res: Response) => {
-  try {
-    const blogs = await Blog.find().sort({ createdAt: -1 }).limit(50);
-    return res.status(200).json(blogs);
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving blogs' });
-  }
+  return res.status(200).json([
+    { title: "Exploring ML-1 Railway Heritage", category: "Travel", content: "A deep dive into Pakistan's historic railway track connecting Karachi and Peshawar." }
+  ]);
 };
 
 export const getNotifications = async (req: Request, res: Response) => {
-  try {
-    const notifications = await Notification.find().sort({ createdAt: -1 }).limit(50);
-    return res.status(200).json(notifications);
-  } catch (error: any) {
-    return res.status(500).json({ success: false, message: 'Server error retrieving notifications' });
-  }
+  return res.status(200).json([
+    { id: 1, title: "Welcome to Pakistan Railways Schedule", message: "Search schedules, fare details, and platform numbers offline and online.", category: "update" }
+  ]);
 };

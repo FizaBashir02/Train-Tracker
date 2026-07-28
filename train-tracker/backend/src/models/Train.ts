@@ -1,48 +1,74 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IScheduleStop {
+export interface IIntermediateStation {
   stationCode: string;
   stationName: string;
-  arrival: string; // "14:30"
-  departure: string; // "14:35"
+  arrival: string;
+  departure: string;
   stopDurationMinutes: number;
   distanceKm: number;
+  platform: string;
 }
 
 export interface ITrain extends Document {
-  trainNumber: string; // e.g. "7UP" or "41DN"
-  trainName: string; // e.g. "Tezgam Express"
-  source: string;
-  destination: string;
+  trainNumber: string; // e.g. "7UP" or "1UP"
+  trainName: string; // e.g. "Green Line Express"
   trainType: 'Express' | 'Passenger' | 'Freight';
+  sourceStation: string;
+  destinationStation: string;
   departureTime: string;
   arrivalTime: string;
-  totalDistanceKm: number;
-  stops: IScheduleStop[];
+  duration: string;
+  distance: number;
+  status: 'On Time' | 'Delayed' | 'Cancelled' | 'Boarding Soon' | 'Departed' | 'Arrived';
+  platform: string;
+  fareEconomy: number;
+  fareBusiness: number;
+  fareAC: number;
+  daysOfOperation: string[];
+  intermediateStations: IIntermediateStation[];
+  route: string;
+  availableSeats: number;
+  lastUpdated: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const ScheduleStopSchema = new Schema({
+const IntermediateStationSchema = new Schema({
   stationCode: { type: String, required: true, uppercase: true },
   stationName: { type: String, required: true },
   arrival: { type: String, required: true },
   departure: { type: String, required: true },
   stopDurationMinutes: { type: Number, required: true, default: 0 },
-  distanceKm: { type: Number, required: true, default: 0 }
-});
+  distanceKm: { type: Number, required: true, default: 0 },
+  platform: { type: String, default: '1' }
+}, { _id: false });
 
 const TrainSchema: Schema = new Schema({
   trainNumber: { type: String, required: true, unique: true, index: true, uppercase: true, trim: true },
   trainName: { type: String, required: true, trim: true },
-  source: { type: String, required: true, uppercase: true },
-  destination: { type: String, required: true, uppercase: true },
   trainType: { type: String, enum: ['Express', 'Passenger', 'Freight'], default: 'Express' },
+  sourceStation: { type: String, required: true },
+  destinationStation: { type: String, required: true },
   departureTime: { type: String, required: true },
   arrivalTime: { type: String, required: true },
-  totalDistanceKm: { type: Number, required: true, default: 0 },
-  stops: [ScheduleStopSchema],
+  duration: { type: String, required: true, default: '12h 00m' },
+  distance: { type: Number, required: true, default: 500 },
+  status: { 
+    type: String, 
+    enum: ['On Time', 'Delayed', 'Cancelled', 'Boarding Soon', 'Departed', 'Arrived'], 
+    default: 'On Time' 
+  },
+  platform: { type: String, default: '1' },
+  fareEconomy: { type: Number, default: 1500 },
+  fareBusiness: { type: Number, default: 3500 },
+  fareAC: { type: Number, default: 5500 },
+  daysOfOperation: [{ type: String }],
+  intermediateStations: [IntermediateStationSchema],
+  route: { type: String, default: 'Main Line 1' },
+  availableSeats: { type: Number, default: 50 },
+  lastUpdated: { type: String, default: 'Just now' },
   isActive: { type: Boolean, default: true }
 }, {
   timestamps: true

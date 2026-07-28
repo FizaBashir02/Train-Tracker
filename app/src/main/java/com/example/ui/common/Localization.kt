@@ -97,7 +97,21 @@ object Localization {
             "calculation_method" to "Calculation Method",
             "asr_method" to "Asr Method",
             "time_format" to "Time Format",
-            "prayer_notifications" to "Prayer Notifications"
+            "prayer_notifications" to "Prayer Notifications",
+            "platform" to "Platform",
+            "fare_economy" to "Economy Fare",
+            "fare_business" to "Business Fare",
+            "fare_ac" to "AC Standard",
+            "available_seats" to "Seats Available",
+            "routes" to "Routes",
+            "train_details" to "Train Details",
+            "intermediate_stations" to "Intermediate Stations",
+            "status" to "Status",
+            "all" to "All",
+            "on_time" to "On Time",
+            "delayed" to "Delayed",
+            "cancelled" to "Cancelled",
+            "boarding_soon" to "Boarding Soon"
         ),
         "ur" to mapOf(
             "app_name" to "ٹرین ٹریکر",

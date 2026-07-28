@@ -262,83 +262,126 @@ class AppRepository(context: Context) {
     }
 
     // --- Cache and Fallbacks Integration ---
-    suspend fun searchTrainsApi(source: String, dest: String, type: String): List<TrainSearchItem> {
+    suspend fun searchTrainsApi(source: String, dest: String, type: String): List<TrainScheduleItem> {
         if (source.isNotEmpty() || dest.isNotEmpty()) {
             val q = if (source.isNotEmpty() && dest.isNotEmpty()) "$source to $dest" else source.ifEmpty { dest }
             addRecentSearch(q, "train")
         }
         logAnalyticsEvent("train_search", "src: $source, dst: $dest, type: $type")
-        
-        // Caching Policy: Check local cache first and return if within TTL (4 hours)
-        val cachedTrains = trainDao.getAllTrainsSync()
-        if (cachedTrains.isNotEmpty()) {
-            val firstCached = cachedTrains.first()
-            if (System.currentTimeMillis() - firstCached.timestamp < 4 * 60 * 60 * 1000) {
-                return cachedTrains.map {
-                    TrainSearchItem(
-                        trainName = it.trainName,
-                        trainNumber = it.trainNumber,
-                        source = it.source,
-                        destination = it.destination,
-                        departure = it.departureTime,
-                        arrival = it.arrivalTime,
-                        duration = it.routeDesc,
-                        trainType = it.type
-                    )
-                }
-            }
-        }
-
         return try {
-            val remoteResults = ApiClient.apiService.searchTrains(source, dest, type)
-            if (remoteResults.isNotEmpty()) {
-                val entities = remoteResults.map {
-                    TrainEntity(
-                        trainNumber = it.trainNumber,
-                        trainName = it.trainName,
-                        source = it.source,
-                        destination = it.destination,
-                        type = it.trainType,
-                        departureTime = it.departure,
-                        arrivalTime = it.arrival,
-                        routeDesc = it.duration,
-                        timestamp = System.currentTimeMillis()
-                    )
-                }
-                trainDao.insertTrains(entities)
-            }
-            remoteResults
+            ApiClient.apiService.searchTrains(source, dest, type)
         } catch (e: Exception) {
             logAnalyticsEvent("retrofit_search_failed", "error: ${e.message}. Using cache fallback.")
-            if (cachedTrains.isNotEmpty()) {
-                cachedTrains.map {
-                    TrainSearchItem(
-                        trainName = it.trainName,
-                        trainNumber = it.trainNumber,
-                        source = it.source,
-                        destination = it.destination,
-                        departure = it.departureTime,
-                        arrival = it.arrivalTime,
-                        duration = it.routeDesc,
-                        trainType = it.type
-                    )
-                }
-            } else {
-                throw e
+            LocalTrainData.getDummyTrains().filter { train ->
+                val matchSource = source.isEmpty() || train.sourceStation.contains(source, ignoreCase = true)
+                val matchDest = dest.isEmpty() || train.destinationStation.contains(dest, ignoreCase = true)
+                val matchType = type == "All" || train.trainType.equals(type, ignoreCase = true)
+                matchSource && matchDest && matchType
             }
         }
     }
 
-    suspend fun getLiveStatusApi(trainNumber: String): LiveStatus {
-        addRecentSearch(trainNumber, "train")
-        logAnalyticsEvent("live_status_fetch", "train: $trainNumber")
-        
-        // Live Status requires direct real-time updates. No Room caching is suitable as primary, always query remote API directly.
-        return ApiClient.apiService.getLiveStatus(trainNumber)
+    // --- Train Schedule Module Repository Methods ---
+    suspend fun getAllTrainsSchedule(filter: FilterOptions): List<TrainScheduleItem> {
+        val baseList = try {
+            val remote = ApiClient.apiService.getAllTrains(
+                name = filter.query.takeIf { it.isNotEmpty() },
+                source = filter.source.takeIf { it.isNotEmpty() },
+                destination = filter.destination.takeIf { it.isNotEmpty() },
+                status = filter.status.takeIf { it != "All" },
+                type = filter.trainType.takeIf { it != "All" }
+            )
+            if (remote.isNotEmpty()) remote else LocalTrainData.getDummyTrains()
+        } catch (e: Exception) {
+            LocalTrainData.getDummyTrains()
+        }
+
+        var result = baseList.filter { item ->
+            val matchesQuery = filter.query.isBlank() || 
+                item.trainName.contains(filter.query, ignoreCase = true) || 
+                item.trainNumber.contains(filter.query, ignoreCase = true) ||
+                item.sourceStation.contains(filter.query, ignoreCase = true) ||
+                item.destinationStation.contains(filter.query, ignoreCase = true)
+
+            val matchesSource = filter.source.isBlank() || 
+                item.sourceStation.contains(filter.source, ignoreCase = true)
+
+            val matchesDest = filter.destination.isBlank() || 
+                item.destinationStation.contains(filter.destination, ignoreCase = true)
+
+            val matchesStatus = filter.status == "All" || 
+                item.status.equals(filter.status, ignoreCase = true)
+
+            val matchesType = filter.trainType == "All" || 
+                item.trainType.equals(filter.trainType, ignoreCase = true)
+
+            matchesQuery && matchesSource && matchesDest && matchesStatus && matchesType
+        }
+
+        result = when (filter.sortBy) {
+            "Duration" -> result.sortedBy { it.duration }
+            "Fare" -> result.sortedBy { it.fareEconomy }
+            else -> result.sortedBy { it.departureTime }
+        }
+
+        return result
     }
 
-    private suspend fun syncSchedule(trainNumber: String, remote: TrainSchedule) {
-        val entities = remote.stations.mapIndexed { index, st ->
+    suspend fun getTrainDetails(trainIdOrNum: String): TrainScheduleItem {
+        return try {
+            ApiClient.apiService.getTrainDetails(trainIdOrNum)
+        } catch (e: Exception) {
+            LocalTrainData.getDummyTrains().find { 
+                it.id.equals(trainIdOrNum, ignoreCase = true) || 
+                it.trainNumber.equals(trainIdOrNum, ignoreCase = true) 
+            } ?: LocalTrainData.getDummyTrains().first()
+        }
+    }
+
+    suspend fun getStationsList(query: String = ""): List<StationItem> {
+        val stations = try {
+            val remote = ApiClient.apiService.getStations(query.takeIf { it.isNotBlank() })
+            if (remote.isNotEmpty()) remote else LocalTrainData.defaultStations
+        } catch (e: Exception) {
+            LocalTrainData.defaultStations
+        }
+
+        if (query.isBlank()) return stations
+        return stations.filter { 
+            it.name.contains(query, ignoreCase = true) || 
+            it.code.contains(query, ignoreCase = true) 
+        }
+    }
+
+    suspend fun getStationDetails(code: String): StationItem {
+        return try {
+            ApiClient.apiService.getStationDetails(code)
+        } catch (e: Exception) {
+            LocalTrainData.defaultStations.find { it.code.equals(code, ignoreCase = true) }
+                ?: LocalTrainData.defaultStations.first()
+        }
+    }
+
+    suspend fun getRoutesList(): List<RouteItem> {
+        return try {
+            val remote = ApiClient.apiService.getRoutes()
+            if (remote.isNotEmpty()) remote else LocalTrainData.defaultRoutes
+        } catch (e: Exception) {
+            LocalTrainData.defaultRoutes
+        }
+    }
+
+    suspend fun getRouteDetails(routeId: String): RouteItem {
+        return try {
+            ApiClient.apiService.getRouteDetails(routeId)
+        } catch (e: Exception) {
+            LocalTrainData.defaultRoutes.find { it.routeId.equals(routeId, ignoreCase = true) }
+                ?: LocalTrainData.defaultRoutes.first()
+        }
+    }
+
+    private suspend fun syncSchedule(trainNumber: String, remote: TrainScheduleItem) {
+        val entities = remote.intermediateStations.mapIndexed { index, st ->
             ScheduleEntity(
                 trainNumber = trainNumber,
                 stationCode = st.stationCode,
@@ -354,7 +397,7 @@ class AppRepository(context: Context) {
         scheduleDao.insertSchedules(entities)
     }
 
-    private suspend fun syncStation(stationCode: String, remote: StationInfo) {
+    private suspend fun syncStation(stationCode: String, remote: StationItem) {
         val entity = StationEntity(
             stationCode = stationCode,
             stationName = remote.stationName,
@@ -392,118 +435,40 @@ class AppRepository(context: Context) {
         blogDao.insertBlogs(entities)
     }
 
-    suspend fun getTrainScheduleApi(trainNumber: String): TrainSchedule {
+    suspend fun getTrainScheduleApi(trainNumber: String): TrainScheduleItem {
         logAnalyticsEvent("train_schedule_fetch", "train: $trainNumber")
-        
-        // Check cache with 4 hour TTL
-        val cachedSchedules = scheduleDao.getSchedulesForTrainSync(trainNumber)
-        if (cachedSchedules.isNotEmpty()) {
-            val firstCached = cachedSchedules.first()
-            if (System.currentTimeMillis() - firstCached.timestamp < 4 * 60 * 60 * 1000) {
-                val localStations = cachedSchedules.map {
-                    ScheduleStation(
-                        stationName = it.stationCode,
-                        stationCode = it.stationCode,
-                        arrival = it.arrivalTime,
-                        departure = it.departureTime,
-                        distanceKm = it.distanceKm,
-                        stopDurationMinutes = it.stopMinutes,
-                        dayNumber = 1
-                    )
-                }
-                return TrainSchedule(
-                    trainName = "Train $trainNumber",
-                    trainNumber = trainNumber,
-                    stations = localStations,
-                    totalStops = localStations.size,
-                    totalDistanceKm = localStations.lastOrNull()?.distanceKm ?: 0,
-                    totalJourneyTime = "N/A"
-                )
-            }
-        }
-
         return try {
             val remote = ApiClient.apiService.getTrainSchedule(trainNumber)
             syncSchedule(trainNumber, remote)
             remote
         } catch (e: Exception) {
             logAnalyticsEvent("retrofit_schedule_failed", "error: ${e.message}. Using cache fallback.")
-            if (cachedSchedules.isNotEmpty()) {
-                val localStations = cachedSchedules.map {
-                    ScheduleStation(
-                        stationName = it.stationCode,
-                        stationCode = it.stationCode,
-                        arrival = it.arrivalTime,
-                        departure = it.departureTime,
-                        distanceKm = it.distanceKm,
-                        stopDurationMinutes = it.stopMinutes,
-                        dayNumber = 1
-                    )
-                }
-                TrainSchedule(
-                    trainName = "Train $trainNumber",
-                    trainNumber = trainNumber,
-                    stations = localStations,
-                    totalStops = localStations.size,
-                    totalDistanceKm = localStations.lastOrNull()?.distanceKm ?: 0,
-                    totalJourneyTime = "N/A"
-                )
-            } else {
-                throw e
-            }
+            LocalTrainData.getDummyTrains().find { it.trainNumber.equals(trainNumber, ignoreCase = true) }
+                ?: LocalTrainData.getDummyTrains().first()
         }
     }
 
-    suspend fun getStationInfoApi(stationCode: String): StationInfo {
+    suspend fun getStationInfoApi(stationCode: String): StationItem {
         addRecentSearch(stationCode, "station")
         logAnalyticsEvent("station_info_fetch", "station: $stationCode")
-
-        val cached = stationDao.getStationByCode(stationCode)
-        if (cached != null && (System.currentTimeMillis() - cached.timestamp < 4 * 60 * 60 * 1000)) {
-            return StationInfo(
-                stationName = cached.stationName,
-                code = stationCode,
-                address = cached.locationDescription,
-                contactNumber = "117",
-                facilities = cached.facilitiesList.split(","),
-                nearbyHotels = emptyList(),
-                nearbyRestaurants = emptyList(),
-                nearbyBusStops = emptyList(),
-                todayArrivals = emptyList(),
-                todayDepartures = emptyList(),
-                delayedTrains = emptyList()
-            )
-        }
-
         return try {
-            val remote = ApiClient.apiService.getStationInfo(stationCode)
+            val remote = ApiClient.apiService.getStationDetails(stationCode)
             syncStation(stationCode, remote)
             remote
         } catch (e: Exception) {
             logAnalyticsEvent("retrofit_station_info_failed", "error: ${e.message}. Using cache fallback.")
-            if (cached != null) {
-                StationInfo(
-                    stationName = cached.stationName,
-                    code = stationCode,
-                    address = cached.locationDescription,
-                    contactNumber = "117",
-                    facilities = cached.facilitiesList.split(","),
-                    nearbyHotels = emptyList(),
-                    nearbyRestaurants = emptyList(),
-                    nearbyBusStops = emptyList(),
-                    todayArrivals = emptyList(),
-                    todayDepartures = emptyList(),
-                    delayedTrains = emptyList()
-                )
-            } else {
-                throw e
-            }
+            LocalTrainData.defaultStations.find { it.code.equals(stationCode, ignoreCase = true) }
+                ?: LocalTrainData.defaultStations.first()
         }
     }
 
-    suspend fun getFreightTrainsApi(): List<FreightTrainItem> {
+    suspend fun getFreightTrainsApi(): List<TrainScheduleItem> {
         logAnalyticsEvent("freight_trains_fetch", "")
-        return ApiClient.apiService.getFreightTrains()
+        return try {
+            ApiClient.apiService.getFreightTrains()
+        } catch (e: Exception) {
+            LocalTrainData.getDummyTrains().filter { it.trainType.equals("Freight", ignoreCase = true) }
+        }
     }
 
     suspend fun getWeatherApi(location: String): WeatherData {

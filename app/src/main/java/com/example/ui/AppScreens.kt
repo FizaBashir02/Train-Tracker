@@ -86,10 +86,11 @@ fun MainAppContainer(viewModel: AppViewModel) {
                         Screen.SignUp -> SignUpScreen(viewModel)
                         Screen.Verification -> VerificationScreen(viewModel)
                         Screen.Home -> HomeDashboardScreen(viewModel)
-                        Screen.TrainSearch -> TrainSearchScreen(viewModel)
-                        Screen.LiveStatus -> LiveStatusScreen(viewModel)
+                        Screen.TrainSearch -> TrainScheduleScreen(viewModel)
                         Screen.TrainScheduleScreen -> TrainScheduleScreen(viewModel)
+                        Screen.TrainDetailScreen -> TrainDetailScreen(viewModel)
                         Screen.StationInfoScreen -> StationInfoScreen(viewModel)
+                        Screen.RouteScreen -> RouteScreen(viewModel)
                         Screen.FreightTrainsScreen -> FreightTrainsScreen(viewModel)
                         Screen.NewsBlogsScreen -> NewsBlogsScreen(viewModel)
                         Screen.NamazTimingsScreen -> NamazTimingsScreen(viewModel)
@@ -106,6 +107,55 @@ fun MainAppContainer(viewModel: AppViewModel) {
 }
 
 // --- Common UI Components ---
+
+@Composable
+fun AppBottomNavigation(currentScreen: Screen, viewModel: AppViewModel) {
+    val lang = viewModel.currentLanguage
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp
+    ) {
+        NavigationBarItem(
+            selected = currentScreen == Screen.Home,
+            onClick = { viewModel.navigateTo(Screen.Home) },
+            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            label = { Text(Localization.getText("home", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+        )
+        NavigationBarItem(
+            selected = currentScreen == Screen.TrainScheduleScreen || currentScreen == Screen.TrainSearch,
+            onClick = {
+                viewModel.loadTrainsSchedule()
+                viewModel.navigateTo(Screen.TrainScheduleScreen)
+            },
+            icon = { Icon(Icons.Default.Schedule, contentDescription = "Schedule") },
+            label = { Text(Localization.getText("train_schedule", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+        )
+        NavigationBarItem(
+            selected = currentScreen == Screen.StationInfoScreen,
+            onClick = {
+                viewModel.loadStations()
+                viewModel.navigateTo(Screen.StationInfoScreen)
+            },
+            icon = { Icon(Icons.Default.LocationOn, contentDescription = "Stations") },
+            label = { Text(Localization.getText("station_info", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+        )
+        NavigationBarItem(
+            selected = currentScreen == Screen.RouteScreen,
+            onClick = {
+                viewModel.loadRoutes()
+                viewModel.navigateTo(Screen.RouteScreen)
+            },
+            icon = { Icon(Icons.Default.AltRoute, contentDescription = "Routes") },
+            label = { Text(Localization.getText("routes", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+        )
+        NavigationBarItem(
+            selected = currentScreen == Screen.ProfileScreen || currentScreen == Screen.SettingsScreen,
+            onClick = { viewModel.navigateTo(Screen.ProfileScreen) },
+            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+            label = { Text(Localization.getText("profile", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1105,11 +1155,12 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 }
             )
             DrawerItem(
-                icon = Icons.Default.MyLocation,
-                title = "Live Tracking",
+                icon = Icons.Default.CalendarMonth,
+                title = "Train Schedule",
                 onClick = {
                     scope.launch { drawerState.close() }
-                    viewModel.fetchLiveStatus("7UP")
+                    viewModel.loadTrainsSchedule()
+                    viewModel.navigateTo(Screen.TrainScheduleScreen)
                 }
             )
             DrawerItem(
@@ -1450,59 +1501,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                 )
             },
             bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp
-                ) {
-                    NavigationBarItem(
-                        selected = true,
-                        onClick = { },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Home", tint = MaterialTheme.colorScheme.primary) },
-                        label = { Text(Localization.getText("home", lang), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = false,
-                        onClick = { 
-                            viewModel.fetchLiveStatus("7UP")
-                            viewModel.navigateTo(Screen.LiveStatus) 
-                        },
-                        icon = { Icon(Icons.Default.DirectionsRailway, contentDescription = "Live Train", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        label = { Text(Localization.getText("live_status", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.Transparent
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = false,
-                        onClick = { viewModel.navigateTo(Screen.TrainSearch) },
-                        icon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        label = { Text(Localization.getText("search", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.Transparent
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = false,
-                        onClick = { viewModel.navigateTo(Screen.FavoritesScreen) },
-                        icon = { Icon(Icons.Default.Favorite, contentDescription = "Favorites", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        label = { Text(Localization.getText("favorites", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.Transparent
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = false,
-                        onClick = { viewModel.navigateTo(Screen.ProfileScreen) },
-                        icon = { Icon(Icons.Default.Person, contentDescription = "Profile", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        label = { Text(Localization.getText("profile", lang), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.Transparent
-                        )
-                    )
-                }
+                AppBottomNavigation(currentScreen = Screen.Home, viewModel = viewModel)
             }
         ) { padding ->
             LazyColumn(
@@ -1580,8 +1579,9 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 focusManager.clearFocus()
                                 keyboardController?.hide()
                                 if (dashboardSearchQuery.isNotEmpty()) {
-                                    viewModel.fetchLiveStatus(dashboardSearchQuery)
-                                    viewModel.navigateTo(Screen.LiveStatus)
+                                    viewModel.filterOptions = viewModel.filterOptions.copy(query = dashboardSearchQuery)
+                                    viewModel.loadTrainsSchedule()
+                                    viewModel.navigateTo(Screen.TrainScheduleScreen)
                                 }
                             })
                         )
@@ -1600,34 +1600,41 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 QuickServiceItem(
-                                    label = "Live Train Status",
-                                    icon = Icons.Default.MyLocation,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { 
-                                        viewModel.fetchLiveStatus("7UP")
-                                        viewModel.navigateTo(Screen.LiveStatus)
-                                    }
-                                )
-                                QuickServiceItem(
                                     label = "Train Schedule",
                                     icon = Icons.Default.CalendarMonth,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
                                     borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
                                     modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.fetchTrainSchedule("7UP") }
+                                    onClick = { 
+                                        viewModel.loadTrainsSchedule()
+                                        viewModel.navigateTo(Screen.TrainScheduleScreen)
+                                    }
                                 )
                                 QuickServiceItem(
-                                    label = "Station Information",
+                                    label = "Stations List",
                                     icon = Icons.Default.Apartment,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
                                     borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
                                     modifier = Modifier.weight(1f),
-                                    onClick = { viewModel.fetchStationInfo("LHR") }
+                                    onClick = {
+                                        viewModel.selectedStation = null
+                                        viewModel.loadStations()
+                                        viewModel.navigateTo(Screen.StationInfoScreen)
+                                    }
+                                )
+                                QuickServiceItem(
+                                    label = "Routes List",
+                                    icon = Icons.Default.AltRoute,
+                                    backgroundColor = Color.White,
+                                    iconColor = Color(0xFF0F7A3E),
+                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        viewModel.loadRoutes()
+                                        viewModel.navigateTo(Screen.RouteScreen)
+                                    }
                                 )
                             }
 
@@ -1637,38 +1644,39 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 QuickServiceItem(
-                                    label = "Station Schedule",
-                                    icon = Icons.Default.Assignment,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        viewModel.fetchStationInfo("LHR")
-                                    }
-                                )
-                                QuickServiceItem(
-                                    label = "Freight Services",
+                                    label = "Freight Trains",
                                     icon = Icons.Default.LocalShipping,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
                                     borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
                                     modifier = Modifier.weight(1f),
                                     onClick = {
-                                        viewModel.fetchFreightTrains()
-                                        viewModel.navigateTo(Screen.FreightTrainsScreen)
+                                        viewModel.filterOptions = viewModel.filterOptions.copy(trainType = "Freight")
+                                        viewModel.loadTrainsSchedule()
+                                        viewModel.navigateTo(Screen.TrainScheduleScreen)
                                     }
                                 )
                                 QuickServiceItem(
-                                    label = "Train Updates",
-                                    icon = Icons.Default.Campaign,
+                                    label = "Seat Availability",
+                                    icon = Icons.Default.AirlineSeatReclineExtra,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
                                     borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
                                     modifier = Modifier.weight(1f),
                                     onClick = {
-                                        viewModel.fetchNewsAndBlogs()
-                                        viewModel.navigateTo(Screen.NewsBlogsScreen)
+                                        viewModel.loadTrainsSchedule()
+                                        viewModel.navigateTo(Screen.TrainScheduleScreen)
+                                    }
+                                )
+                                QuickServiceItem(
+                                    label = "Favorites",
+                                    icon = Icons.Default.Favorite,
+                                    backgroundColor = Color.White,
+                                    iconColor = Color(0xFF0F7A3E),
+                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        viewModel.navigateTo(Screen.FavoritesScreen)
                                     }
                                 )
                             }
@@ -1741,8 +1749,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             Spacer(modifier = Modifier.height(12.dp))
 
                             OutlinedTextField(
-                                value = viewModel.searchSource,
-                                onValueChange = { viewModel.searchSource = it },
+                                value = viewModel.filterOptions.source,
+                                onValueChange = { viewModel.filterOptions = viewModel.filterOptions.copy(source = it) },
                                 label = { Text(text = Localization.getText("source", lang)) },
                                 leadingIcon = { Icon(Icons.Default.TripOrigin, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 modifier = Modifier.fillMaxWidth(),
@@ -1756,8 +1764,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             Spacer(modifier = Modifier.height(8.dp))
 
                             OutlinedTextField(
-                                value = viewModel.searchDest,
-                                onValueChange = { viewModel.searchDest = it },
+                                value = viewModel.filterOptions.destination,
+                                onValueChange = { viewModel.filterOptions = viewModel.filterOptions.copy(destination = it) },
                                 label = { Text(text = Localization.getText("destination", lang)) },
                                 leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 modifier = Modifier.fillMaxWidth(),
@@ -1770,8 +1778,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     onSearch = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
-                                        viewModel.runTrainSearch()
-                                        viewModel.navigateTo(Screen.TrainSearch)
+                                        viewModel.loadTrainsSchedule()
+                                        viewModel.navigateTo(Screen.TrainScheduleScreen)
                                     }
                                 )
                             )
@@ -1782,8 +1790,8 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 onClick = {
                                     focusManager.clearFocus()
                                     keyboardController?.hide()
-                                    viewModel.runTrainSearch()
-                                    viewModel.navigateTo(Screen.TrainSearch)
+                                    viewModel.loadTrainsSchedule()
+                                    viewModel.navigateTo(Screen.TrainScheduleScreen)
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1799,12 +1807,15 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     }
                 }
 
-            // 4. Tracked Train Card
+            // 4. Featured Train Schedule Card
             item {
-                val activeStatus = viewModel.activeLiveStatus
+                val sPrev = "Karachi Cantt"
+                val sNext = "Islamabad"
+                val sProgress = 0.65f
+                val sEta = "20:15"
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                     Text(
-                        text = "LIVE TRACKING PROFILE",
+                        text = "FEATURED EXPRESS TRAIN",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1812,17 +1823,9 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     
-                    val sName = activeStatus?.trainName ?: "Green Line Express"
-                    val sNum = activeStatus?.trainNumber ?: "1UP"
-                    val sDelay = activeStatus?.delayMinutes ?: 0
-                    val sPrev = activeStatus?.previousStation ?: "Karachi Cantt"
-                    val sNext = activeStatus?.nextStation ?: "Rohri Junction"
-                    val sProgress = activeStatus?.journeyProgress ?: 0.5f
-                    val sEta = activeStatus?.eta ?: "2:45 PM"
-                    
                     Card(
                         onClick = {
-                            viewModel.fetchLiveStatus(sNum)
+                            viewModel.selectTrainDetails("1UP")
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
@@ -1831,7 +1834,6 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                            // Left border green accent strip
                             Box(
                                 modifier = Modifier
                                     .width(4.dp)
@@ -1847,32 +1849,31 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 ) {
                                     Column {
                                         Text(
-                                            text = "TRACKED TRAIN",
+                                            text = "POPULAR EXPRESS",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.ExtraBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             letterSpacing = 0.5.sp
                                         )
                                         Text(
-                                            text = "$sName ($sNum)",
+                                            text = "Green Line Express (1UP)",
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                     
-                                    val isLate = sDelay > 0
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(if (isLate) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer)
+                                            .background(MaterialTheme.colorScheme.primaryContainer)
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
                                         Text(
-                                            text = if (isLate) "${sDelay} MIN LATE" else "ON TIME",
+                                            text = "ON TIME",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isLate) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
                                         )
                                     }
                                 }
@@ -2082,8 +2083,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     modifier = Modifier
                                         .width(220.dp)
                                         .clickable { 
-                                            viewModel.fetchLiveStatus(t.trainNumber)
-                                            viewModel.navigateTo(Screen.LiveStatus)
+                                            viewModel.selectTrainDetails(t.trainNumber)
                                         },
                                     shape = RoundedCornerShape(18.dp),
                                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -2163,19 +2163,21 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                         ) {
                             items(recentSearches.take(6)) { search ->
                                 Card(
-                                    modifier = Modifier
-                                        .clickable {
-                                            if (search.query.contains("to")) {
-                                                val parts = search.query.split("to")
-                                                viewModel.searchSource = parts[0].trim()
-                                                viewModel.searchDest = parts.getOrNull(1)?.trim() ?: ""
-                                                viewModel.runTrainSearch()
-                                                viewModel.navigateTo(Screen.TrainSearch)
-                                            } else {
-                                                viewModel.fetchLiveStatus(search.query)
-                                                viewModel.navigateTo(Screen.LiveStatus)
-                                            }
-                                        },
+                                    modifier = Modifier.clickable {
+                                        if (search.query.contains("to")) {
+                                            val parts = search.query.split("to")
+                                            viewModel.filterOptions = viewModel.filterOptions.copy(
+                                                source = parts[0].trim(),
+                                                destination = parts.getOrNull(1)?.trim() ?: ""
+                                            )
+                                            viewModel.loadTrainsSchedule()
+                                            viewModel.navigateTo(Screen.TrainScheduleScreen)
+                                        } else {
+                                            viewModel.filterOptions = viewModel.filterOptions.copy(query = search.query)
+                                            viewModel.loadTrainsSchedule()
+                                            viewModel.navigateTo(Screen.TrainScheduleScreen)
+                                        }
+                                    },
                                     shape = RoundedCornerShape(20.dp),
                                     colors = CardDefaults.cardColors(containerColor = Color.White),
                                     border = BorderStroke(1.dp, Color(0xFFE2E8F0))
@@ -2253,10 +2255,17 @@ data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val 
 @Composable
 fun TrainSearchScreen(viewModel: AppViewModel) {
     val lang = viewModel.currentLanguage
-    val results = viewModel.searchResults
+    val results = viewModel.trainsList
+
+    LaunchedEffect(Unit) {
+        if (results.isEmpty()) {
+            viewModel.loadTrainsSchedule()
+        }
+    }
 
     Scaffold(
-        topBar = { AppTopBar(title = "Train Search Results", lang = lang, onBack = { viewModel.goBack() }) }
+        topBar = { AppTopBar(title = "Train Search Results", lang = lang, onBack = { viewModel.goBack() }) },
+        bottomBar = { AppBottomNavigation(currentScreen = Screen.TrainSearch, viewModel = viewModel) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (results.isEmpty() && !viewModel.isLoading) {
@@ -2273,6 +2282,7 @@ fun TrainSearchScreen(viewModel: AppViewModel) {
                 LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                     items(results) { t ->
                         Card(
+                            onClick = { viewModel.selectTrainDetails(t.trainNumber) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp),
@@ -2288,7 +2298,7 @@ fun TrainSearchScreen(viewModel: AppViewModel) {
                                 ) {
                                     Column {
                                         Text(t.trainName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                        Text(t.trainNumber, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                        Text("Train #${t.trainNumber}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                     }
                                     SuggestionChip(
                                         onClick = {},
@@ -2302,8 +2312,8 @@ fun TrainSearchScreen(viewModel: AppViewModel) {
                                 ) {
                                     Column {
                                         Text("Departure", fontSize = 11.sp, color = Color.Gray)
-                                        Text(t.departure, fontWeight = FontWeight.Bold)
-                                        Text(t.source, fontSize = 12.sp, color = Color.Gray)
+                                        Text(t.departureTime, fontWeight = FontWeight.Bold)
+                                        Text(t.sourceStation, fontSize = 12.sp, color = Color.Gray)
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("Duration", fontSize = 11.sp, color = Color.Gray)
@@ -2312,253 +2322,29 @@ fun TrainSearchScreen(viewModel: AppViewModel) {
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
                                         Text("Arrival", fontSize = 11.sp, color = Color.Gray)
-                                        Text(t.arrival, fontWeight = FontWeight.Bold)
-                                        Text(t.destination, fontSize = 12.sp, color = Color.Gray)
+                                        Text(t.arrivalTime, fontWeight = FontWeight.Bold)
+                                        Text(t.destinationStation, fontSize = 12.sp, color = Color.Gray)
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    TextButton(onClick = { viewModel.fetchTrainSchedule(t.trainNumber) }) {
-                                        Text("Schedule")
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Status: ${t.status}",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (t.status == "On Time") Color(0xFF0F7A3E) else Color.Red,
+                                        fontSize = 12.sp
+                                    )
                                     Button(
-                                        onClick = { viewModel.fetchLiveStatus(t.trainNumber) },
+                                        onClick = { viewModel.selectTrainDetails(t.trainNumber) },
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
-                                        Text("Track Live")
+                                        Text("View Schedule")
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (viewModel.isLoading) {
-                LoadingOverlay(lang)
-            }
-        }
-    }
-}
-
-// --- 8. Live Train Status Screen ---
-@Composable
-fun LiveStatusScreen(viewModel: AppViewModel) {
-    val lang = viewModel.currentLanguage
-    val status = viewModel.activeLiveStatus
-    val favTrains by viewModel.favoriteTrains.collectAsState()
-
-    Scaffold(
-        topBar = {
-            AppTopBar(
-                title = "Live Status: ${status?.trainNumber ?: ""}",
-                lang = lang,
-                onBack = { viewModel.goBack() },
-                actions = {
-                    status?.let { s ->
-                        val isFav = favTrains.any { it.trainNumber == s.trainNumber }
-                        IconButton(onClick = {
-                            val f = FavoriteTrain(s.trainNumber, s.trainName, s.previousStation, s.nextStation)
-                            viewModel.toggleFavoriteTrain(f, !isFav)
-                        }) {
-                            Icon(
-                                imageVector = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Favorite",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            status?.let { s ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
-                ) {
-                    // Header card with delay
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(s.trainName, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                                Text("Train #${s.trainNumber}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = if (s.delayMinutes > 0) "${s.delayMinutes} Mins Late" else "On Time",
-                                    color = if (s.delayMinutes > 0) Color.Red else Color(0xFF0F7A3E),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
-                                Text("Updated: ${s.lastUpdated}", fontSize = 11.sp, color = Color.Gray)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Progress Track Drawing
-                    Text("Journey Progress", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(s.previousStation, fontSize = 12.sp, color = Color.Gray)
-                                Text("Current: ${s.currentStation}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Text(s.nextStation, fontSize = 12.sp, color = Color.Gray)
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            LinearProgressIndicator(
-                                progress = { s.journeyProgress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Estimated Arrival: ${s.eta}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text("${s.distanceRemainingKm} KM remaining", fontSize = 11.sp, color = Color.Gray)
-                                Text("Estimated Departure: ${s.etd}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Text("Live Route Tracker Map (GPS Active)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    InteractiveRouteMap(status = s)
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text("Route Schedule Milestones", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val stops = listOf(
-                        Triple(s.previousStation, "Passed - 100% accurate", true),
-                        Triple(s.currentStation, "Arrived - Status: ${if (s.delayMinutes > 0) "Delayed" else "On-time"}", true),
-                        Triple(s.nextStation, "Expected at ${s.eta}", false),
-                        Triple("Final Destination", "Route termination point", false)
-                    )
-
-                    stops.forEachIndexed { index, stop ->
-                        Row(modifier = Modifier.height(64.dp)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(32.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (stop.third) MaterialTheme.colorScheme.primary else Color.LightGray)
-                                )
-                                if (index < stops.size - 1) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(2.dp)
-                                            .weight(1f)
-                                            .background(if (stop.third) MaterialTheme.colorScheme.primary else Color.LightGray)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(stop.first, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(stop.second, fontSize = 11.sp, color = Color.Gray)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Button(
-                        onClick = { viewModel.fetchTrainSchedule(s.trainNumber) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("View Complete Timetable & Schedule")
-                    }
-                }
-            }
-
-            if (status == null && !viewModel.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = "Error",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Live Tracking Offline",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = viewModel.errorMessage ?: "Live status tracking endpoint is currently offline. Secure production API integration is prepared and waiting to connect.",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Button(
-                                onClick = { viewModel.fetchLiveStatus(viewModel.liveStatusQuery.ifEmpty { "7UP" }) },
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.Refresh, contentDescription = "Retry")
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Retry Connection")
                             }
                         }
                     }
@@ -2576,78 +2362,496 @@ fun LiveStatusScreen(viewModel: AppViewModel) {
 @Composable
 fun TrainScheduleScreen(viewModel: AppViewModel) {
     val lang = viewModel.currentLanguage
-    val schedule = viewModel.activeTrainSchedule
+    val filter = viewModel.filterOptions
+    val trains = viewModel.trainsList
+
+    LaunchedEffect(Unit) {
+        if (trains.isEmpty()) {
+            viewModel.loadTrainsSchedule()
+        }
+    }
 
     Scaffold(
-        topBar = { AppTopBar(title = "Schedule: ${schedule?.trainName ?: ""}", lang = lang, onBack = { viewModel.goBack() }) }
+        topBar = {
+            AppTopBar(
+                title = Localization.getText("train_schedule", lang),
+                lang = lang,
+                onBack = { viewModel.goBack() }
+            )
+        },
+        bottomBar = {
+            AppBottomNavigation(currentScreen = Screen.TrainScheduleScreen, viewModel = viewModel)
+        }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            schedule?.let { sch ->
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("Route Timetable Info", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Total Stops: ${sch.totalStops}", fontSize = 13.sp)
-                                    Text("Distance: ${sch.totalDistanceKm} KM", fontSize = 13.sp)
-                                    Text("Time: ${sch.totalJourneyTime}", fontSize = 13.sp)
-                                }
-                            }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Search Input
+            OutlinedTextField(
+                value = filter.query,
+                onValueChange = { q -> viewModel.loadTrainsSchedule(filter.copy(query = q)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text(Localization.getText("search_train", lang), fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (filter.query.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.loadTrainsSchedule(filter.copy(query = "")) }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear")
                         }
                     }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
 
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Station", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(2f))
-                            Text("Arr", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Text("Dep", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Text("Stop", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        }
-                    }
+            // Type Filter Chips
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val types = listOf("All", "Express", "Passenger", "Freight")
+                items(types) { type ->
+                    FilterChip(
+                        selected = filter.trainType == type,
+                        onClick = { viewModel.loadTrainsSchedule(filter.copy(trainType = type)) },
+                        label = { Text(type, fontSize = 12.sp) }
+                    )
+                }
+            }
 
-                    items(sch.stations) { st ->
-                        Row(
+            // Status Filter Chips
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val statuses = listOf("All", "On Time", "Delayed", "Boarding Soon", "Departed", "Arrived")
+                items(statuses) { status ->
+                    FilterChip(
+                        selected = filter.status == status,
+                        onClick = { viewModel.loadTrainsSchedule(filter.copy(status = status)) },
+                        label = { Text(status, fontSize = 12.sp) }
+                    )
+                }
+            }
+
+            // Sorting Options
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("${trains.size} Trains Found", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sort: ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    listOf("Departure", "Duration", "Fare").forEach { sort ->
+                        Text(
+                            text = sort,
+                            fontSize = 11.sp,
+                            fontWeight = if (filter.sortBy == sort) FontWeight.Bold else FontWeight.Normal,
+                            color = if (filter.sortBy == sort) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(2f)) {
-                                Text(st.stationName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("${st.stationCode} • Day ${st.dayNumber} • ${st.distanceKm} Km", fontSize = 11.sp, color = Color.Gray)
-                            }
-                            Text(st.arrival, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Text(st.departure, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Text(
-                                text = if (st.stopDurationMinutes > 0) "${st.stopDurationMinutes} m" else "--",
-                                fontSize = 13.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                .clickable { viewModel.loadTrainsSchedule(filter.copy(sortBy = sort)) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
 
-            if (viewModel.isLoading) {
-                LoadingOverlay(lang)
+            // Trains Schedule List
+            if (trains.isEmpty() && !viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.DirectionsRailway, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("No train schedules match your filter.", color = Color.Gray)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(trains) { train ->
+                        TrainScheduleCard(train = train, onClick = { viewModel.selectTrainDetails(train.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TrainScheduleCard(train: TrainScheduleItem, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header: Name, Number, Status badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = train.trainNumber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = train.trainName,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                val statusBg = when (train.status) {
+                    "On Time" -> Color(0xFFE8F5E9)
+                    "Delayed" -> Color(0xFFFFEBEE)
+                    "Boarding Soon" -> Color(0xFFE3F2FD)
+                    else -> Color(0xFFF5F5F5)
+                }
+                val statusTxt = when (train.status) {
+                    "On Time" -> Color(0xFF2E7D32)
+                    "Delayed" -> Color(0xFFC62828)
+                    "Boarding Soon" -> Color(0xFF1565C0)
+                    else -> Color.DarkGray
+                }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = statusBg
+                ) {
+                    Text(
+                        text = train.status,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = statusTxt,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Route & Timings
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(train.departureTime, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(train.sourceStation, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(train.duration, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text("${train.distance} KM", fontSize = 10.sp, color = Color.Gray)
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(train.arrivalTime, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(train.destinationStation, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Footer Badges: Platform, Seats, Fare
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("Pf. ${train.platform}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    if (train.availableSeats > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.EventSeat, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF0F7A3E))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("${train.availableSeats} Seats", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F7A3E))
+                        }
+                    }
+                }
+
+                if (train.fareEconomy > 0) {
+                    Text(
+                        text = "Rs. ${train.fareEconomy}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TrainDetailScreen(viewModel: AppViewModel) {
+    val lang = viewModel.currentLanguage
+    val train = viewModel.selectedTrain
+    val favTrains by viewModel.favoriteTrains.collectAsState()
+
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = train?.trainName ?: "Train Details",
+                lang = lang,
+                onBack = { viewModel.goBack() },
+                actions = {
+                    train?.let { tr ->
+                        val isFav = favTrains.any { it.trainNumber == tr.trainNumber }
+                        IconButton(onClick = {
+                            val f = FavoriteTrain(tr.trainNumber, tr.trainName, tr.sourceStation, tr.destinationStation)
+                            viewModel.toggleFavoriteTrain(f, !isFav)
+                        }) {
+                            Icon(
+                                imageVector = if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Favorite",
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (train == null) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("Train information not found.")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(train.trainName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Text("Train #${train.trainNumber} • ${train.trainType}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                ) {
+                                    Text(
+                                        text = train.status,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                QuickInfoCol("Platform", train.platform)
+                                QuickInfoCol("Seats", "${train.availableSeats} Available")
+                                QuickInfoCol("Distance", "${train.distance} KM")
+                                QuickInfoCol("Days", train.daysOfOperation.joinToString(","))
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Ticket Fares & Classes", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                FareItemCard("Economy", "Rs. ${train.fareEconomy}", Modifier.weight(1f))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                FareItemCard("Business", "Rs. ${train.fareBusiness}", Modifier.weight(1f))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                FareItemCard("AC Standard", "Rs. ${train.fareAC}", Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text("Intermediate Stations & Schedule", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                }
+
+                items(train.intermediateStations) { st ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(st.stationName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("${st.stationCode} • ${st.distanceKm} KM • Platform ${st.platform}", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Arr: ${st.arrival}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Dep: ${st.departure}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                if (st.stopDurationMinutes > 0) {
+                                    Text("Halt: ${st.stopDurationMinutes}m", fontSize = 10.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickInfoCol(label: String, value: String) {
+    Column {
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+    }
+}
+
+@Composable
+fun FareItemCard(classTitle: String, fareText: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(classTitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(fareText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+fun RouteScreen(viewModel: AppViewModel) {
+    val lang = viewModel.currentLanguage
+    val routes = viewModel.routesList
+
+    LaunchedEffect(Unit) {
+        if (routes.isEmpty()) {
+            viewModel.loadRoutes()
+        }
+    }
+
+    Scaffold(
+        topBar = { AppTopBar(title = Localization.getText("routes", lang), lang = lang, onBack = { viewModel.goBack() }) },
+        bottomBar = { AppBottomNavigation(currentScreen = Screen.RouteScreen, viewModel = viewModel) }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(routes) { route ->
+                Card(
+                    onClick = { viewModel.selectRouteDetails(route.routeId) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(route.routeName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("${route.origin} ➔ ${route.terminus}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Distance: ${route.totalDistanceKm} KM", fontSize = 12.sp, color = Color.Gray)
+                            Text("Stations: ${route.stations.size}", fontSize = 12.sp, color = Color.Gray)
+                            Text("Active Trains: ${route.trainsCount}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }
@@ -2657,16 +2861,30 @@ fun TrainScheduleScreen(viewModel: AppViewModel) {
 @Composable
 fun StationInfoScreen(viewModel: AppViewModel) {
     val lang = viewModel.currentLanguage
-    val info = viewModel.activeStationInfo
+    val info = viewModel.selectedStation
+    val stations = viewModel.stationsList
     val favStations by viewModel.favoriteStations.collectAsState()
     var selectedTab by remember { mutableStateOf(0) }
+    var stationSearchQuery by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        if (stations.isEmpty()) {
+            viewModel.loadStations()
+        }
+    }
 
     Scaffold(
         topBar = {
             AppTopBar(
-                title = info?.stationName ?: "Station Details",
+                title = info?.stationName ?: Localization.getText("station_info", lang),
                 lang = lang,
-                onBack = { viewModel.goBack() },
+                onBack = {
+                    if (info != null) {
+                        viewModel.selectedStation = null
+                    } else {
+                        viewModel.goBack()
+                    }
+                },
                 actions = {
                     info?.let { inf ->
                         val isFav = favStations.any { it.stationCode == inf.code }
@@ -2683,44 +2901,117 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                     }
                 }
             )
+        },
+        bottomBar = {
+            AppBottomNavigation(currentScreen = Screen.StationInfoScreen, viewModel = viewModel)
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            info?.let { inf ->
+            if (info == null) {
+                // Stations List View
+                Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    OutlinedTextField(
+                        value = stationSearchQuery,
+                        onValueChange = { stationSearchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        placeholder = { Text("Search Station Name or Code", fontSize = 14.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (stationSearchQuery.isNotEmpty()) {
+                                IconButton(onClick = { stationSearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    val filteredStations = stations.filter {
+                        it.stationName.contains(stationSearchQuery, ignoreCase = true) ||
+                        it.stationCode.contains(stationSearchQuery, ignoreCase = true)
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(filteredStations) { st ->
+                            Card(
+                                onClick = { viewModel.selectStationDetails(st.stationCode) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primaryContainer
+                                        ) {
+                                            Text(
+                                                text = st.stationCode,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(st.stationName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text(st.address, fontSize = 12.sp, color = Color.Gray)
+                                        }
+                                    }
+
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Station Detail View
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Beautiful hero banner image of Lahore Junction Station
+                    // Hero banner
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
+                            .height(180.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.img_lahore_junction_1783744552039),
-                            contentDescription = inf.stationName,
+                            contentDescription = info.stationName,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
-                        // Gradient overlay for visual fidelity and title readability
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
                                     brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                                         colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
-                                        startY = 100f
+                                        startY = 80f
                                     )
                                 )
                         )
-                        // Station Name and code overlay
                         Column(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .padding(16.dp)
                         ) {
                             Text(
-                                text = inf.stationName.uppercase(),
+                                text = info.stationName.uppercase(),
                                 color = Color.White,
-                                fontSize = 22.sp,
+                                fontSize = 20.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 1.sp
                             )
@@ -2734,7 +3025,7 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Station Code: ${inf.code}",
+                                    text = "Station Code: ${info.code}",
                                     color = Color(0xFFE8F3ED),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -2745,13 +3036,13 @@ fun StationInfoScreen(viewModel: AppViewModel) {
 
                     TabRow(selectedTabIndex = selectedTab) {
                         Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                            Text("Facilities", modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                            Text("Facilities", modifier = Modifier.padding(14.dp), fontWeight = FontWeight.Bold)
                         }
                         Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                            Text("Schedule", modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                            Text("Schedule", modifier = Modifier.padding(14.dp), fontWeight = FontWeight.Bold)
                         }
                         Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }) {
-                            Text("Nearby", modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                            Text("Nearby", modifier = Modifier.padding(14.dp), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -2760,15 +3051,15 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                             item {
                                 Text("Contact Information", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(inf.address, fontSize = 14.sp)
-                                Text("Helpline: ${inf.contactNumber}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text(info.address, fontSize = 14.sp)
+                                Text("Helpline: ${info.contactNumber}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                             item {
                                 Text("Station Facilities", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
-                            items(inf.facilities) { fac ->
+                            items(info.facilities) { fac ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -2785,7 +3076,7 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                                 Text("Today's Arrivals", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
-                            items(inf.todayArrivals) { arr ->
+                            items(info.todayArrivals) { arr ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -2800,7 +3091,7 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                                 Text("Today's Departures", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
-                            items(inf.todayDepartures) { dep ->
+                            items(info.todayDepartures) { dep ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -2817,7 +3108,7 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                                 Text("Nearby Hotels", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
-                            items(inf.nearbyHotels) { hot ->
+                            items(info.nearbyHotels) { hot ->
                                 Text("🏨 $hot", modifier = Modifier.padding(vertical = 4.dp), fontSize = 14.sp)
                             }
                             item {
@@ -2825,7 +3116,7 @@ fun StationInfoScreen(viewModel: AppViewModel) {
                                 Text("Nearby Restaurants", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
-                            items(inf.nearbyRestaurants) { res ->
+                            items(info.nearbyRestaurants) { res ->
                                 Text("🍴 $res", modifier = Modifier.padding(vertical = 4.dp), fontSize = 14.sp)
                             }
                         }
@@ -2879,14 +3170,14 @@ fun FreightTrainsScreen(viewModel: AppViewModel) {
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("Route: ${ft.route}", fontSize = 13.sp)
-                                Text("Cargo Type: ${ft.cargoType}", fontSize = 13.sp, color = Color.Gray)
+                                Text("Type: ${ft.trainType}", fontSize = 13.sp, color = Color.Gray)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Position: ${ft.currentPosition}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("ETA: ${ft.eta}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    Text("Route: ${ft.sourceStation} ➔ ${ft.destinationStation}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Status: ${ft.status}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -3549,7 +3840,7 @@ fun FavoritesScreen(viewModel: AppViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clickable { viewModel.fetchLiveStatus(t.trainNumber) },
+                                .clickable { viewModel.selectTrainDetails(t.trainNumber) },
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Row(
@@ -3597,7 +3888,7 @@ fun FavoritesScreen(viewModel: AppViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clickable { viewModel.fetchStationInfo(s.stationCode) },
+                                .clickable { viewModel.selectStationDetails(s.stationCode) },
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Row(
@@ -3969,127 +4260,4 @@ fun HelplineScreen(viewModel: AppViewModel) {
     }
 }
 
-fun getStationCoords(stationName: String): LatLng {
-    val lower = stationName.lowercase()
-    return when {
-        lower.contains("karachi") -> LatLng(24.8532, 67.0347)
-        lower.contains("lahore") -> LatLng(31.5744, 74.3494)
-        lower.contains("rawalpindi") -> LatLng(33.6011, 73.0712)
-        lower.contains("peshawar") -> LatLng(34.0044, 71.5441)
-        lower.contains("sahiwal") -> LatLng(30.6682, 73.1114)
-        lower.contains("okara") -> LatLng(30.8014, 73.4473)
-        lower.contains("gujranwala") -> LatLng(32.1617, 74.1883)
-        lower.contains("jhelum") -> LatLng(32.9333, 73.7333)
-        lower.contains("multan") -> LatLng(30.1872, 71.4389)
-        lower.contains("khanewal") -> LatLng(30.3017, 71.9328)
-        lower.contains("quetta") -> LatLng(30.1833, 66.9967)
-        lower.contains("sukkur") -> LatLng(27.7022, 68.8456)
-        lower.contains("rohri") -> LatLng(27.6811, 68.8953)
-        lower.contains("bahawalpur") -> LatLng(29.3956, 71.6833)
-        lower.contains("faisalabad") -> LatLng(31.4178, 73.0792)
-        else -> LatLng(30.0, 70.0)
-    }
-}
 
-fun interpolateLatLng(from: LatLng, to: LatLng, fraction: Float): LatLng {
-    val lat = from.latitude + (to.latitude - from.latitude) * fraction
-    val lng = from.longitude + (to.longitude - from.longitude) * fraction
-    return LatLng(lat, lng)
-}
-
-@Composable
-fun InteractiveRouteMap(status: LiveStatus) {
-    val prevCoords = getStationCoords(status.previousStation)
-    val nextCoords = getStationCoords(status.nextStation)
-    val progress = status.journeyProgress.coerceIn(0.0f, 1.0f)
-    val trainCoords = interpolateLatLng(prevCoords, nextCoords, progress)
-
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(trainCoords, 8.0f)
-    }
-
-    // Smoothly animate map camera when position updates
-    LaunchedEffect(trainCoords) {
-        cameraPositionState.animate(
-            com.google.android.gms.maps.CameraUpdateFactory.newLatLng(trainCoords),
-            1000
-        )
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Real production Google Map instance integration
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState
-            ) {
-                // Traversed route
-                Polyline(
-                    points = listOf(prevCoords, trainCoords),
-                    color = Color(0xFF4CAF50),
-                    width = 8f
-                )
-                
-                // Remaining route
-                Polyline(
-                    points = listOf(trainCoords, nextCoords),
-                    color = Color.LightGray,
-                    width = 8f
-                )
-
-                // Station markers
-                Marker(
-                    state = rememberMarkerState(position = prevCoords),
-                    title = status.previousStation,
-                    snippet = "Previous Station"
-                )
-
-                Marker(
-                    state = rememberMarkerState(position = nextCoords),
-                    title = status.nextStation,
-                    snippet = "Upcoming Station"
-                )
-
-                // Current train position marker
-                Marker(
-                    state = rememberMarkerState(position = trainCoords),
-                    title = status.trainName,
-                    snippet = "Train Number: ${status.trainNumber} (${(progress * 100).toInt()}% Journey Progress)"
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
-            ) {
-                Text("GPS POSITION: LOCKED", fontSize = 10.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-                Text("LAT: ${"%.4f".format(trainCoords.latitude)}° N", fontSize = 9.sp, color = Color.White, fontFamily = FontFamily.Monospace)
-                Text("LON: ${"%.4f".format(trainCoords.longitude)}° E", fontSize = 9.sp, color = Color.White, fontFamily = FontFamily.Monospace)
-            }
-
-            val speedKmph = if (status.delayMinutes > 15) 95 else 75
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
-                    .padding(8.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                Text("SPEED", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                Text("$speedKmph KM/H", fontSize = 12.sp, color = Color(0xFF2196F3), fontWeight = FontWeight.Bold)
-                Text("DELAY: ${status.delayMinutes} MINS", fontSize = 9.sp, color = if (status.delayMinutes > 0) Color.Red else Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
