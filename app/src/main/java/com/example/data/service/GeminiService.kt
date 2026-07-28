@@ -723,7 +723,7 @@ object GeminiService {
         }
         return listOf(
             NewsItem("New Coaches Added to Green Line", "New Trains", "Today", "Pakistan Railways has added modern, comfortable Chinese passenger coaches to the premium Green Line Express starting this Friday."),
-            NewsItem("Track Maintenance near Jhelum to Cause Brief Delays", "Maintenance", "Yesterday", "Due to routine annual safety upgrades on the main up-line near Jhelum, trains departing Lahore may experience 15-20 min delays."),
+            NewsItem("Railway Line Maintenance near Jhelum to Cause Brief Delays", "Maintenance", "Yesterday", "Due to routine annual safety upgrades on the main up-line near Jhelum, trains departing Lahore may experience 15-20 min delays."),
             NewsItem("PR Helpline 117 Upgraded with 24/7 Live Status Support", "Announcements", "2 days ago", "The official railway helpline 117 has been modernized with additional live operators and instant AI status inquiry systems.")
         )
     }

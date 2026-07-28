@@ -167,13 +167,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             repository.notifications.collect { list ->
                 if (list.isEmpty()) {
                     repository.addNotification(
-                        "Welcome to Train Tracker",
+                        "Welcome to Train Schedule",
                         "The official Pakistan Railways information assistant is now active.",
                         "announcement"
                     )
                     repository.addNotification(
                         "Schedule Update: Khyber Mail",
-                        "Khyber Mail (1UP) is running on time today. Track its live progress on our map.",
+                        "Khyber Mail (1UP) is running on time today. View full schedule and platform timings.",
                         "update"
                     )
                 }

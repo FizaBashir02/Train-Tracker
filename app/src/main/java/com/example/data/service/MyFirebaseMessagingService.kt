@@ -108,10 +108,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 },
                 NotificationChannel(
                     "delays_channel",
-                    "Train Delays & Tracking Updates",
+                    "Train Delays & Schedule Updates",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Real-time delay tracking, arrival projections, and active GPS telemetry updates"
+                    description = "Timetable delay updates, schedule adjustments, and platform changes"
                 },
                 NotificationChannel(
                     "news_channel",

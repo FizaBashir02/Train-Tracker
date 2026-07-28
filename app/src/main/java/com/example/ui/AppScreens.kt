@@ -51,13 +51,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.example.ui.common.Localization
 import kotlinx.coroutines.delay
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
 import kotlinx.coroutines.launch
 
 import com.example.ui.theme.MyApplicationTheme
@@ -283,7 +276,7 @@ fun SplashScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.size(50.dp)
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            // Draw realistic track sleepers
+                            // Draw realistic railway sleepers
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                                 modifier = Modifier.height(4.dp)
@@ -304,7 +297,7 @@ fun SplashScreen(viewModel: AppViewModel) {
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "TRAIN TRACKER",
+                    text = "TRAIN SCHEDULE",
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF0F7A3E),
@@ -315,7 +308,7 @@ fun SplashScreen(viewModel: AppViewModel) {
                 Spacer(modifier = Modifier.height(2.dp))
 
                 Text(
-                    text = "Track Every Journey",
+                    text = "Schedule Every Journey",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF475569), // Slate 600
@@ -410,9 +403,9 @@ fun OnboardingScreen(viewModel: AppViewModel) {
     var pageIndex by remember { mutableStateOf(0) }
     val pages = listOf(
         Triple(
-            "Track in Real Time",
-            "Get precise GPS coordinates and delay predictions for all passenger trains on the Pakistan Railways network.",
-            Icons.Default.MyLocation
+            "Explore Train Schedules",
+            "Browse comprehensive departure and arrival schedules for all passenger trains on the Pakistan Railways network.",
+            Icons.Default.Schedule
         ),
         Triple(
             "Complete Schedules",
@@ -573,7 +566,7 @@ fun LoginScreen(viewModel: AppViewModel) {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Sign in to track your Pakistan Railways trains",
+                    text = "Sign in to view Pakistan Railways train schedules",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
@@ -1073,14 +1066,14 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "TRAIN TRACKER",
+                            text = "TRAIN SCHEDULE",
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                             fontSize = 16.sp,
                             letterSpacing = 0.5.sp
                         )
                         Text(
-                            text = "Track Every Journey",
+                            text = "Schedule Every Journey",
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium
@@ -3413,7 +3406,7 @@ fun NamazTimingsScreen(viewModel: AppViewModel) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Date & Location Info Card
+                    // Date & Station Info Card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -4191,7 +4184,7 @@ fun SettingsScreen(viewModel: AppViewModel) {
             Text(Localization.getText("about_legals", lang), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text("Train Tracker app is optimized for premium Pakistan Railways tracking. Fully secure and JWT standard compatible encryption.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Train Schedule app is optimized for Pakistan Railways train schedules, timings, and routes. Fully secure and JWT standard compatible encryption.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
 
             Text("${Localization.getText("version", lang)} 2.0.4", fontWeight = FontWeight.Bold, fontSize = 13.sp)
