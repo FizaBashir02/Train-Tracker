@@ -73,16 +73,20 @@ data class CityCoordinates(val city: String, val lat: Double, val lng: Double, v
 object PrayerTimeCalculator {
 
     val defaultCities = listOf(
+        CityCoordinates("Islamabad", 33.6844, 73.0479),
+        CityCoordinates("Rawalpindi", 33.5651, 73.0169),
         CityCoordinates("Lahore", 31.5204, 74.3587),
         CityCoordinates("Karachi", 24.8607, 67.0011),
-        CityCoordinates("Rawalpindi", 33.5651, 73.0169),
-        CityCoordinates("Islamabad", 33.6844, 73.0479),
         CityCoordinates("Peshawar", 34.0151, 71.5249),
-        CityCoordinates("Multan", 30.1575, 71.5249),
         CityCoordinates("Quetta", 30.1798, 66.9750),
         CityCoordinates("Faisalabad", 31.4504, 73.1350),
-        CityCoordinates("Sialkot", 32.4945, 74.5229),
+        CityCoordinates("Multan", 30.1575, 71.5249),
+        CityCoordinates("Sargodha", 32.0836, 72.6711),
+        CityCoordinates("Gujranwala", 32.1617, 74.1883),
         CityCoordinates("Hyderabad", 25.3960, 68.3578),
+        CityCoordinates("Bahawalpur", 29.3956, 71.6836),
+        CityCoordinates("Sialkot", 32.4945, 74.5229),
+        CityCoordinates("Abbottabad", 34.1688, 73.2215),
         CityCoordinates("Sukkur", 27.7244, 68.8228)
     )
 

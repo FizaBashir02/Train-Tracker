@@ -34,7 +34,7 @@ android {
   compileSdk = 34
 
   defaultConfig {
-    applicationId = "com.aistudio.traintracker.trktra"
+    applicationId = "com.aistudio.trainschedule.trktra"
     minSdk = 23
     targetSdk = 34
     versionCode = 1
@@ -43,19 +43,12 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     val apiUrl = getEnvVar("API_URL", "https://your-production-railway-app-url.railway.app/api/")
-    val googleMapsApiKey = getEnvVar("GOOGLE_MAPS_API_KEY", "")
     val geminiApiKey = getEnvVar("GEMINI_API_KEY", "MY_GEMINI_API_KEY")
 
     if (apiUrl.isNotEmpty()) {
       buildConfigField("String", "API_URL", "\"$apiUrl\"")
     } else {
       buildConfigField("String", "API_URL", "\"\"")
-    }
-
-    if (googleMapsApiKey.isNotEmpty()) {
-      buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
-    } else {
-      buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"\"")
     }
 
     if (geminiApiKey.isNotEmpty()) {
@@ -147,9 +140,6 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  // implementation(libs.play.services.location)
-  // implementation(libs.play.services.maps)
-  // implementation(libs.maps.compose)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

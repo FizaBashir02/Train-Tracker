@@ -24,21 +24,6 @@ data class TrainSearchItem(
     val trainType: String // "Express", "Passenger", "Freight"
 )
 
-data class LiveStatus(
-    val trainName: String,
-    val trainNumber: String,
-    val currentStation: String,
-    val previousStation: String,
-    val nextStation: String,
-    val eta: String,
-    val etd: String,
-    val delayMinutes: Int,
-    val journeyProgress: Float, // 0.0f to 1.0f
-    val distanceRemainingKm: Int,
-    val runningDays: String,
-    val lastUpdated: String
-)
-
 data class ScheduleStation(
     val stationName: String,
     val stationCode: String,
@@ -278,81 +263,6 @@ object GeminiService {
         }.ifEmpty {
             all.filter { type == "All" || it.trainType.equals(type, ignoreCase = true) }
         }
-    }
-
-    // --- Live Train Status ---
-    suspend fun getLiveStatus(trainNumber: String): LiveStatus {
-        val prompt = """
-            Provide a realistic live running status for Pakistan Railways train number '$trainNumber'.
-            Generate detailed delay statistics, current progress, distance remaining, running days, and previous/next station.
-            
-            Return a JSON object with this schema:
-            {
-              "trainName": "Karakoram Express",
-              "trainNumber": "$trainNumber",
-              "currentStation": "Sahiwal",
-              "previousStation": "Khanewal Junction",
-              "nextStation": "Okara",
-              "eta": "22:45",
-              "etd": "22:50",
-              "delayMinutes": 25,
-              "journeyProgress": 0.72,
-              "distanceRemainingKm": 210,
-              "runningDays": "Daily",
-              "lastUpdated": "2 mins ago"
-            }
-        """.trimIndent()
-
-        val jsonStr = callGeminiJson(prompt)
-        if (jsonStr != null) {
-            try {
-                val obj = JSONObject(jsonStr)
-                return LiveStatus(
-                    trainName = obj.optString("trainName", "Express Train"),
-                    trainNumber = obj.optString("trainNumber", trainNumber),
-                    currentStation = obj.optString("currentStation", "Jhelum"),
-                    previousStation = obj.optString("previousStation", "Gujrat"),
-                    nextStation = obj.optString("nextStation", "Rawalpindi"),
-                    eta = obj.optString("eta", "12:30"),
-                    etd = obj.optString("etd", "12:35"),
-                    delayMinutes = obj.optInt("delayMinutes", 15),
-                    journeyProgress = obj.optDouble("journeyProgress", 0.6).toFloat(),
-                    distanceRemainingKm = obj.optInt("distanceRemainingKm", 120),
-                    runningDays = obj.optString("runningDays", "Daily"),
-                    lastUpdated = obj.optString("lastUpdated", "Just now")
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to parse live status JSON", e)
-            }
-        }
-        return getFallbackLiveStatus(trainNumber)
-    }
-
-    private fun getFallbackLiveStatus(trainNumber: String): LiveStatus {
-        val name = when (trainNumber.uppercase()) {
-            "42DN", "42" -> "Karakoram Express"
-            "5UP", "5" -> "Green Line"
-            "7UP", "7" -> "Tezgam"
-            "1UP", "1" -> "Khyber Mail"
-            "27UP", "27" -> "Shalimar Express"
-            "33UP", "33" -> "Pak Business Express"
-            "F-901" -> "Coal Special"
-            else -> "Tezgam"
-        }
-        return LiveStatus(
-            trainName = name,
-            trainNumber = trainNumber,
-            currentStation = "Rohri Junction",
-            previousStation = "Khairpur",
-            nextStation = "Bahawalpur",
-            eta = "14:15",
-            etd = "14:30",
-            delayMinutes = 40,
-            journeyProgress = 0.45f,
-            distanceRemainingKm = 480,
-            runningDays = "Daily",
-            lastUpdated = "5 mins ago"
-        )
     }
 
     // --- Train Schedule ---
@@ -724,7 +634,7 @@ object GeminiService {
         return listOf(
             NewsItem("New Coaches Added to Green Line", "New Trains", "Today", "Pakistan Railways has added modern, comfortable Chinese passenger coaches to the premium Green Line Express starting this Friday."),
             NewsItem("Railway Line Maintenance near Jhelum to Cause Brief Delays", "Maintenance", "Yesterday", "Due to routine annual safety upgrades on the main up-line near Jhelum, trains departing Lahore may experience 15-20 min delays."),
-            NewsItem("PR Helpline 117 Upgraded with 24/7 Live Status Support", "Announcements", "2 days ago", "The official railway helpline 117 has been modernized with additional live operators and instant AI status inquiry systems.")
+            NewsItem("PR Helpline 117 Upgraded with 24/7 Schedule & Fare Inquiry Support", "Announcements", "2 days ago", "The official railway helpline 117 has been modernized with additional live operators and instant AI schedule inquiry systems.")
         )
     }
 

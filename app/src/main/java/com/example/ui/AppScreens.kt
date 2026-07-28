@@ -130,7 +130,7 @@ fun AppBottomNavigation(currentScreen: Screen, viewModel: AppViewModel) {
                 viewModel.loadStations()
                 viewModel.navigateTo(Screen.StationInfoScreen)
             },
-            icon = { Icon(Icons.Default.LocationOn, contentDescription = "Stations") },
+            icon = { Icon(Icons.Default.Place, contentDescription = "Stations") },
             label = { Text(Localization.getText("station_info", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
         )
         NavigationBarItem(
@@ -1144,7 +1144,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 }
             )
             DrawerItem(
-                icon = Icons.Default.LocationOn,
+                icon = Icons.Default.Place,
                 title = "Stations",
                 onClick = {
                     scope.launch { drawerState.close() }
@@ -2559,7 +2559,7 @@ fun TrainScheduleCard(train: TrainScheduleItem, onClick: () -> Unit) {
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(2.dp))
                         Text("Pf. ${train.platform}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -2718,7 +2718,7 @@ fun TrainDetailScreen(viewModel: AppViewModel) {
                                     modifier = Modifier.size(36.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                     }
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -3246,7 +3246,7 @@ fun NamazTimingsScreen(viewModel: AppViewModel) {
     val prayerData = viewModel.prayerTimesData
     val settings = viewModel.prayerSettings
     val countdownText = viewModel.prayerCountdownText
-    val cities = listOf("Lahore", "Karachi", "Rawalpindi", "Islamabad", "Peshawar", "Multan", "Quetta", "Faisalabad", "Sialkot", "Hyderabad", "Sukkur")
+    val cities = com.example.util.PrayerTimeCalculator.defaultCities.map { it.city }
 
     var showSettingsDialog by remember { mutableStateOf(false) }
 
@@ -3286,7 +3286,7 @@ fun NamazTimingsScreen(viewModel: AppViewModel) {
                             onClick = { viewModel.fetchWeatherAndNamaz(city) },
                             label = { Text(city, fontSize = 12.sp) },
                             leadingIcon = if (viewModel.currentCity == city) {
-                                { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(16.dp)) }
                             } else null
                         )
                     }
@@ -4147,6 +4147,22 @@ fun SettingsScreen(viewModel: AppViewModel) {
                     checked = viewModel.isDarkMode,
                     onCheckedChange = { viewModel.updateDarkMode(it) }
                 )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("Default City (Weather & Namaz)", fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(com.example.util.PrayerTimeCalculator.defaultCities.map { it.city }) { city ->
+                        FilterChip(
+                            selected = viewModel.currentCity == city,
+                            onClick = { viewModel.fetchWeatherAndNamaz(city) },
+                            label = { Text(city, fontSize = 12.sp) }
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
