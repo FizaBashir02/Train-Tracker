@@ -21,6 +21,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
 
+    @Suppress("DEPRECATION")
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d("FCM", "New registration token generated: $token")

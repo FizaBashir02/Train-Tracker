@@ -199,7 +199,7 @@ class TokenManager(private val context: android.content.Context) {
 object ApiClient {
     private val BASE_URL: String = run {
         val raw = com.example.BuildConfig.API_URL.takeIf { !it.isNullOrBlank() }
-            ?: "https://train-tracker-production-b6d0.up.railway.app/api/"
+            ?: "https://train-schedule-production-b6d0.up.railway.app/api/"
         var url = raw.trim()
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             url = "https://$url"

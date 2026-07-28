@@ -150,7 +150,7 @@ object GeminiService {
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$apiKey"
 
         val systemInstruction = """
-            You are the backend assistant for Pakistan Railways Train Tracker app.
+            You are the backend assistant for Pakistan Railways Train Schedule app.
             You must ALWAYS return responses as raw, valid, and well-formed JSON matches the requested schema EXACTLY.
             Do not enclose the JSON in ```json blocks or markdown formatting. Output raw JSON ONLY.
             Use realistic values for Pakistan Railways stations, trains, timings, Namaz, and news.

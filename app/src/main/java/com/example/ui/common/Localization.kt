@@ -3,9 +3,9 @@ package com.example.ui.common
 object Localization {
     private val translations = mapOf(
         "en" to mapOf(
-            "app_name" to "Train Tracker",
+            "app_name" to "Train Schedule",
             "search_train" to "Search Train",
-            "live_status" to "Live Train Status",
+            "live_status" to "Train Schedule",
             "train_schedule" to "Train Schedule",
             "station_info" to "Station Info",
             "freight_trains" to "Freight Trains",
@@ -114,9 +114,9 @@ object Localization {
             "boarding_soon" to "Boarding Soon"
         ),
         "ur" to mapOf(
-            "app_name" to "ٹرین ٹریکر",
+            "app_name" to "ٹرین شیڈول",
             "search_train" to "ٹرین تلاش کریں",
-            "live_status" to "لائیو ٹرین اسٹیٹس",
+            "live_status" to "ٹرین کا شیڈول",
             "train_schedule" to "ٹرین کا شیڈول",
             "station_info" to "اسٹیشن معلومات",
             "freight_trains" to "مال گاڑیاں",

@@ -133,13 +133,12 @@ fun AppBottomNavigation(currentScreen: Screen, viewModel: AppViewModel) {
             label = { Text(Localization.getText("station_info", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
         )
         NavigationBarItem(
-            selected = currentScreen == Screen.RouteScreen,
+            selected = currentScreen == Screen.FavoritesScreen,
             onClick = {
-                viewModel.loadRoutes()
-                viewModel.navigateTo(Screen.RouteScreen)
+                viewModel.navigateTo(Screen.FavoritesScreen)
             },
-            icon = { Icon(Icons.Default.AltRoute, contentDescription = "Routes") },
-            label = { Text(Localization.getText("routes", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            icon = { Icon(Icons.Default.Favorite, contentDescription = "Favorites") },
+            label = { Text(Localization.getText("favorites", lang), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
         )
         NavigationBarItem(
             selected = currentScreen == Screen.ProfileScreen || currentScreen == Screen.SettingsScreen,
@@ -1140,16 +1139,8 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 }
             )
             DrawerItem(
-                icon = Icons.Default.Person,
-                title = "My Profile",
-                onClick = {
-                    scope.launch { drawerState.close() }
-                    viewModel.navigateTo(Screen.ProfileScreen)
-                }
-            )
-            DrawerItem(
                 icon = Icons.Default.CalendarMonth,
-                title = "Train Schedule",
+                title = "Schedules",
                 onClick = {
                     scope.launch { drawerState.close() }
                     viewModel.loadTrainsSchedule()
@@ -1157,11 +1148,21 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 }
             )
             DrawerItem(
-                icon = Icons.Default.Search,
-                title = "Train Search",
+                icon = Icons.Default.LocationOn,
+                title = "Stations",
                 onClick = {
                     scope.launch { drawerState.close() }
-                    viewModel.navigateTo(Screen.TrainSearch)
+                    viewModel.loadStations()
+                    viewModel.navigateTo(Screen.StationInfoScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.AutoMirrored.Filled.AltRoute,
+                title = "Routes",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.loadRoutes()
+                    viewModel.navigateTo(Screen.RouteScreen)
                 }
             )
             DrawerItem(
@@ -1170,6 +1171,23 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 onClick = {
                     scope.launch { drawerState.close() }
                     viewModel.navigateTo(Screen.FavoritesScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.WbSunny,
+                title = "Weather & Prayer Timings",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.fetchWeatherAndNamaz("Lahore")
+                    viewModel.navigateTo(Screen.NamazTimingsScreen)
+                }
+            )
+            DrawerItem(
+                icon = Icons.Default.Person,
+                title = "My Profile",
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    viewModel.navigateTo(Screen.ProfileScreen)
                 }
             )
             DrawerItem(
@@ -1188,15 +1206,6 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                     scope.launch { drawerState.close() }
                     viewModel.fetchNewsAndBlogs()
                     viewModel.navigateTo(Screen.NewsBlogsScreen)
-                }
-            )
-            DrawerItem(
-                icon = Icons.Default.SelfImprovement,
-                title = "Weather & Prayer Timings",
-                onClick = {
-                    scope.launch { drawerState.close() }
-                    viewModel.fetchWeatherAndNamaz("Lahore")
-                    viewModel.navigateTo(Screen.NamazTimingsScreen)
                 }
             )
             DrawerItem(
@@ -1327,7 +1336,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 }
             )
             DrawerItem(
-                icon = Icons.Default.ContactSupport,
+                icon = Icons.AutoMirrored.Filled.ContactSupport,
                 title = "Contact Us",
                 onClick = {
                     scope.launch { drawerState.close() }
@@ -1351,7 +1360,7 @@ fun DrawerContent(viewModel: AppViewModel, drawerState: DrawerState) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.ExitToApp,
+                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                     contentDescription = null,
                     tint = Color.Red,
                     modifier = Modifier.size(20.dp)
@@ -1619,7 +1628,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 )
                                 QuickServiceItem(
                                     label = "Routes List",
-                                    icon = Icons.Default.AltRoute,
+                                    icon = Icons.AutoMirrored.Filled.AltRoute,
                                     backgroundColor = Color.White,
                                     iconColor = Color(0xFF0F7A3E),
                                     borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
