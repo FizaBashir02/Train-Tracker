@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ٹرین شیڈول</string>
+    <string name="train_schedule">ٹرین کا شیڈول</string>
+    <string name="schedules">شیڈول</string>
+    <string name="todays_trains">آج کی ٹرینیں</string>
+    <string name="upcoming_departures">آنے والی روانگیاں</string>
+    <string name="search_train">ٹرین شیڈول تلاش کریں</string>
+    <string name="search_train_schedule">ٹرین شیڈول تلاش کریں</string>
+    <string name="station_info">اسٹیشن معلومات</string>
+    <string name="stations">اسٹیشنز</string>
+    <string name="routes">مقبول راستے</string>
+    <string name="favorites">پسندیدہ</string>
+    <string name="weather">موسم</string>
+    <string name="namaz_timings">نماز کے اوقات</string>
+    <string name="railway_news">ریلوے کی خبریں</string>
+    <string name="freight_trains">مال گاڑیاں</string>
+    <string name="home">ہوم</string>
+    <string name="profile">پروفائل</string>
+    <string name="settings">ترتیبات</string>
+    <string name="about">معلومات</string>
+    <string name="departure">روانگی</string>
+    <string name="arrival">آمد</string>
+    <string name="source_station">روانگی اسٹیشن</string>
+    <string name="destination_station">پہنچنے کا اسٹیشن</string>
+</resources>

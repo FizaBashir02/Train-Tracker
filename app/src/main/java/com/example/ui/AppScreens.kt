@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.*
+import com.example.data.repository.LocalTrainData
 import com.example.data.service.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -226,13 +227,8 @@ fun SplashScreen(viewModel: AppViewModel) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        delay(2500) // Splash delay
-        val currentUser = viewModel.repository.getActiveUserSync()
-        if (currentUser != null) {
-            viewModel.navigateAndClear(Screen.Home)
-        } else {
-            viewModel.navigateAndClear(Screen.Onboarding)
-        }
+        delay(1000) // Splash delay
+        viewModel.navigateAndClear(Screen.Home)
     }
 
     Box(
@@ -1436,6 +1432,12 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    LaunchedEffect(Unit) {
+        if (viewModel.trainsList.isEmpty()) {
+            viewModel.loadTrainsSchedule()
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -1590,13 +1592,13 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     }
                 }
 
-                // 2. Main Navigation Quick Services Grid (3x3 layout) matching Screen 2
+                // 2. Quick Access Services Grid
                 item {
                     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // Row 1
+                            // Row 1 - Core Scheduling Features
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1604,9 +1606,9 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 QuickServiceItem(
                                     label = "Train Schedule",
                                     icon = Icons.Default.CalendarMonth,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    iconColor = MaterialTheme.colorScheme.primary,
+                                    borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.weight(1f),
                                     onClick = { 
                                         viewModel.loadTrainsSchedule()
@@ -1614,11 +1616,11 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     }
                                 )
                                 QuickServiceItem(
-                                    label = "Stations List",
+                                    label = "Stations",
                                     icon = Icons.Default.Apartment,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    iconColor = MaterialTheme.colorScheme.primary,
+                                    borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         viewModel.selectedStation = null
@@ -1627,11 +1629,11 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     }
                                 )
                                 QuickServiceItem(
-                                    label = "Routes List",
+                                    label = "Routes",
                                     icon = Icons.AutoMirrored.Filled.AltRoute,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    iconColor = MaterialTheme.colorScheme.primary,
+                                    borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         viewModel.loadRoutes()
@@ -1640,17 +1642,28 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 )
                             }
 
-                            // Row 2
+                            // Row 2 - Secondary Options
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 QuickServiceItem(
-                                    label = "Freight Trains",
+                                    label = "Favorites",
+                                    icon = Icons.Default.Favorite,
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    iconColor = MaterialTheme.colorScheme.primary,
+                                    borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        viewModel.navigateTo(Screen.FavoritesScreen)
+                                    }
+                                )
+                                QuickServiceItem(
+                                    label = "Freight",
                                     icon = Icons.Default.LocalShipping,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    iconColor = MaterialTheme.colorScheme.primary,
+                                    borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         viewModel.filterOptions = viewModel.filterOptions.copy(trainType = "Freight")
@@ -1659,65 +1672,11 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                     }
                                 )
                                 QuickServiceItem(
-                                    label = "Seat Availability",
-                                    icon = Icons.Default.AirlineSeatReclineExtra,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        viewModel.loadTrainsSchedule()
-                                        viewModel.navigateTo(Screen.TrainScheduleScreen)
-                                    }
-                                )
-                                QuickServiceItem(
-                                    label = "Favorites",
-                                    icon = Icons.Default.Favorite,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        viewModel.navigateTo(Screen.FavoritesScreen)
-                                    }
-                                )
-                            }
-
-                            // Row 3
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                QuickServiceItem(
-                                    label = "Railway News",
-                                    icon = Icons.Default.Newspaper,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        viewModel.fetchNewsAndBlogs()
-                                        viewModel.navigateTo(Screen.NewsBlogsScreen)
-                                    }
-                                )
-                                QuickServiceItem(
-                                    label = "Weather",
+                                    label = "Weather & Namaz",
                                     icon = Icons.Default.WbSunny,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        viewModel.fetchWeatherAndNamaz("Lahore")
-                                        viewModel.navigateTo(Screen.NamazTimingsScreen)
-                                    }
-                                )
-                                QuickServiceItem(
-                                    label = "Prayer Timings",
-                                    icon = Icons.Default.SelfImprovement,
-                                    backgroundColor = Color.White,
-                                    iconColor = Color(0xFF0F7A3E),
-                                    borderStroke = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    iconColor = MaterialTheme.colorScheme.primary,
+                                    borderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         viewModel.fetchWeatherAndNamaz("Lahore")
@@ -1729,7 +1688,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     }
                 }
 
-                // 3. Quick Train Route Lookup Card
+                // 3. Quick Train Route Search Card
                 item {
                     Card(
                         modifier = Modifier
@@ -1742,7 +1701,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
                             Text(
-                                text = "SEARCH TRAIN ROUTE",
+                                text = "SEARCH TRAIN SCHEDULE",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1758,9 +1717,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(
-                                    imeAction = ImeAction.Next
-                                )
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -1773,9 +1730,7 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(
-                                    imeAction = ImeAction.Search
-                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(
                                     onSearch = {
                                         focusManager.clearFocus()
@@ -1803,404 +1758,253 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
                             ) {
                                 Icon(imageVector = Icons.Default.Search, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = Localization.getText("search", lang).uppercase(), fontWeight = FontWeight.Bold)
+                                Text(text = "SEARCH SCHEDULES", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
 
-            // 4. Featured Train Schedule Card
-            item {
-                val sPrev = "Karachi Cantt"
-                val sNext = "Islamabad"
-                val sProgress = 0.65f
-                val sEta = "20:15"
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                    Text(
-                        text = "FEATURED EXPRESS TRAIN",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    Card(
-                        onClick = {
-                            viewModel.selectTrainDetails("1UP")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(2.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp)
-                                    .fillMaxHeight()
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                            
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "POPULAR EXPRESS",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            letterSpacing = 0.5.sp
-                                        )
-                                        Text(
-                                            text = "Green Line Express (1UP)",
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(MaterialTheme.colorScheme.primaryContainer)
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = "ON TIME",
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
-                                
-                                Spacer(modifier = Modifier.height(16.dp))
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = if (sPrev.contains(" ")) sPrev.split(" ").map { it.take(1) }.joinToString("").uppercase() else sPrev.take(3).uppercase(),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = sPrev,
-                                            fontSize = 9.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    
-                                    Row(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(2.dp)
-                                                .background(Color(0xFFE2E8F0))
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth(sProgress)
-                                                    .height(2.dp)
-                                                    .background(Color(0xFF0F7A3E))
-                                            )
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.Center)
-                                                    .size(8.dp)
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(Color(0xFF0F7A3E))
-                                            )
-                                        }
-                                    }
-                                    
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = if (sNext.contains(" ")) sNext.split(" ").map { it.take(1) }.joinToString("").uppercase() else sNext.take(3).uppercase(),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
-                                        )
-                                        Text(
-                                            text = sNext,
-                                            fontSize = 9.sp,
-                                            color = Color(0xFF64748B),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                
-                                Spacer(modifier = Modifier.height(16.dp))
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Next Station: $sNext",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFF64748B),
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "ETA: $sEta",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFF0F7A3E),
-                                        letterSpacing = 0.5.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 5. Side-by-Side Info Tiles (Weather & Namaz)
-            item {
-                val weather = viewModel.weatherData
-                val namaz = viewModel.namazTimings
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Weather Tile (E8F3ED background)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFFE8F3ED))
-                            .clickable {
-                                viewModel.fetchWeatherAndNamaz(viewModel.currentCity.ifEmpty { "Lahore" })
-                                viewModel.navigateTo(Screen.NamazTimingsScreen)
-                            }
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "WEATHER",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0F7A3E).copy(alpha = 0.7f),
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = weather?.temperature ?: "24°C",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F7A3E)
-                        )
-                        Text(
-                            text = weather?.condition ?: "Partly Cloudy",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF2E9E5B)
-                        )
-                    }
-                    
-                    // Namaz Tile (F9F4EB background)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFFF9F4EB))
-                            .clickable {
-                                viewModel.fetchWeatherAndNamaz(viewModel.currentCity.ifEmpty { "Lahore" })
-                                viewModel.navigateTo(Screen.NamazTimingsScreen)
-                            }
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "NEXT PRAYER",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF8D6E63),
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Dhuhr",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF5D4037)
-                        )
-                        Text(
-                            text = "at ${namaz?.dhuhr ?: "12:45 PM"}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF795548)
-                        )
-                    }
-                }
-            }
-
-            // 6. Favorite Quick Access List
-            if (favTrains.isNotEmpty()) {
+                // 4. TODAY'S TRAINS SCHEDULE SECTION (Arrivals & Departures)
                 item {
-                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    val todayTrains = viewModel.trainsList.ifEmpty { LocalTrainData.getDummyTrains() }.take(6)
+                    TodayTrains(
+                        trains = todayTrains,
+                        onTrainClick = { trainNum ->
+                            viewModel.selectTrainDetails(trainNum)
+                        },
+                        onViewAllClick = {
+                            viewModel.loadTrainsSchedule()
+                            viewModel.navigateTo(Screen.TrainScheduleScreen)
+                        },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                }
+
+                // 5. Side-by-Side Info Tiles (Weather & Namaz)
+                item {
+                    val weather = viewModel.weatherData
+                    val namaz = viewModel.namazTimings
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Weather Tile
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickable {
+                                    viewModel.fetchWeatherAndNamaz(viewModel.currentCity.ifEmpty { "Lahore" })
+                                    viewModel.navigateTo(Screen.NamazTimingsScreen)
+                                }
+                                .padding(16.dp)
                         ) {
                             Text(
-                                text = "FAVORITES",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B),
+                                text = "WEATHER",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                                 letterSpacing = 1.sp
                             )
-                            TextButton(onClick = { viewModel.navigateTo(Screen.FavoritesScreen) }) {
-                                Text("SEE ALL", color = Color(0xFF0F7A3E), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = weather?.temperature ?: "24°C",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = weather?.condition ?: "Partly Cloudy",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(favTrains) { t ->
-                                Card(
-                                    modifier = Modifier
-                                        .width(220.dp)
-                                        .clickable { 
-                                            viewModel.selectTrainDetails(t.trainNumber)
-                                        },
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                                    elevation = CardDefaults.cardElevation(1.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+
+                        // Namaz Tile
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                .clickable {
+                                    viewModel.fetchWeatherAndNamaz(viewModel.currentCity.ifEmpty { "Lahore" })
+                                    viewModel.navigateTo(Screen.NamazTimingsScreen)
+                                }
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = "NEXT PRAYER",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Dhuhr",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                text = "at ${namaz?.dhuhr ?: "12:45 PM"}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+
+                // 6. Favorite Quick Access List
+                if (favTrains.isNotEmpty()) {
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "FAVORITE SCHEDULES",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    letterSpacing = 1.sp
+                                )
+                                TextButton(onClick = { viewModel.navigateTo(Screen.FavoritesScreen) }) {
+                                    Text("SEE ALL", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(favTrains) { t ->
+                                    Card(
+                                        modifier = Modifier
+                                            .width(220.dp)
+                                            .clickable { 
+                                                viewModel.selectTrainDetails(t.trainNumber)
+                                            },
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                                        elevation = CardDefaults.cardElevation(1.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(14.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.DirectionsRailway,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = t.trainName,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
                                                 Icon(
-                                                    imageVector = Icons.Default.DirectionsRailway,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF0F7A3E),
+                                                    imageVector = Icons.Default.Star,
+                                                    contentDescription = "Favorite",
+                                                    tint = Color(0xFFFBBF24),
                                                     modifier = Modifier.size(16.dp)
                                                 )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = t.trainName,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 13.sp,
-                                                    color = Color(0xFF0F172A),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
                                             }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Icon(
-                                                imageVector = Icons.Default.Star,
-                                                contentDescription = "Favorite",
-                                                tint = Color(0xFFFBBF24), // Amber star
-                                                modifier = Modifier.size(16.dp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "${t.source} ➔ ${t.destination}",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = "${t.source} ➔ ${t.destination}",
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF64748B)
-                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // 7. Recent Searches History
-            item {
-                val recentSearches by viewModel.recentTrainSearches.collectAsState()
-                if (recentSearches.isNotEmpty()) {
-                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "RECENT SEARCHES",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF64748B),
-                                letterSpacing = 1.sp
-                            )
-                            TextButton(onClick = { viewModel.clearSearchHistory("train") }) {
-                                Text("CLEAR ALL", color = Color(0xFFDC2626), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                // 7. Recent Searches History
+                item {
+                    val recentSearches by viewModel.recentTrainSearches.collectAsState()
+                    if (recentSearches.isNotEmpty()) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "RECENT SEARCHES",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    letterSpacing = 1.sp
+                                )
+                                TextButton(onClick = { viewModel.clearSearchHistory("train") }) {
+                                    Text("CLEAR ALL", color = MaterialTheme.colorScheme.error, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(recentSearches.take(6)) { search ->
-                                Card(
-                                    modifier = Modifier.clickable {
-                                        if (search.query.contains("to")) {
-                                            val parts = search.query.split("to")
-                                            viewModel.filterOptions = viewModel.filterOptions.copy(
-                                                source = parts[0].trim(),
-                                                destination = parts.getOrNull(1)?.trim() ?: ""
-                                            )
-                                            viewModel.loadTrainsSchedule()
-                                            viewModel.navigateTo(Screen.TrainScheduleScreen)
-                                        } else {
-                                            viewModel.filterOptions = viewModel.filterOptions.copy(query = search.query)
-                                            viewModel.loadTrainsSchedule()
-                                            viewModel.navigateTo(Screen.TrainScheduleScreen)
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(recentSearches.take(6)) { search ->
+                                    Card(
+                                        modifier = Modifier.clickable {
+                                            if (search.query.contains("to")) {
+                                                val parts = search.query.split("to")
+                                                viewModel.filterOptions = viewModel.filterOptions.copy(
+                                                    source = parts[0].trim(),
+                                                    destination = parts.getOrNull(1)?.trim() ?: ""
+                                                )
+                                                viewModel.loadTrainsSchedule()
+                                                viewModel.navigateTo(Screen.TrainScheduleScreen)
+                                            } else {
+                                                viewModel.filterOptions = viewModel.filterOptions.copy(query = search.query)
+                                                viewModel.loadTrainsSchedule()
+                                                viewModel.navigateTo(Screen.TrainScheduleScreen)
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.History,
-                                            contentDescription = null,
-                                            tint = Color(0xFF94A3B8),
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = search.query,
-                                            fontSize = 12.sp,
-                                            color = Color(0xFF334155),
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.History,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = search.query,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -2210,7 +2014,6 @@ fun HomeDashboardScreen(viewModel: AppViewModel) {
             }
         }
     }
-}
 }
 
 // Retain ShortcutCard to guarantee compatibility if imported elsewhere
@@ -2355,6 +2158,164 @@ fun TrainSearchScreen(viewModel: AppViewModel) {
 
             if (viewModel.isLoading) {
                 LoadingOverlay(lang)
+            }
+        }
+    }
+}
+
+// --- TodayTrains Component ---
+@Composable
+fun TodayTrains(
+    trains: List<TrainScheduleItem>,
+    onTrainClick: (String) -> Unit,
+    onViewAllClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "TODAY'S TRAIN SCHEDULES",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    letterSpacing = 0.5.sp
+                )
+            }
+            TextButton(onClick = onViewAllClick) {
+                Text("VIEW ALL (50+)", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            trains.forEach { train ->
+                Card(
+                    onClick = { onTrainClick(train.trainNumber) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${train.trainName} (${train.trainNumber})",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${train.sourceStation} ➔ ${train.destinationStation}",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            when (train.status.uppercase()) {
+                                                "ON TIME" -> MaterialTheme.colorScheme.primaryContainer
+                                                "BOARDING" -> Color(0xFFFEF3C7)
+                                                "DEPARTED" -> Color(0xFFE2E8F0)
+                                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                            }
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = train.status.uppercase(),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when (train.status.uppercase()) {
+                                            "ON TIME" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                            "BOARDING" -> Color(0xFF92400E)
+                                            "DEPARTED" -> Color(0xFF475569)
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.DepartureBoard,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Dep: ${train.departureTime}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Arr: ${train.arrivalTime}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Text(
+                                    text = train.platform,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

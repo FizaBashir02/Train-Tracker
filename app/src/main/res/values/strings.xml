@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">Train Schedule</string>
+    <string name="train_schedule">Train Schedule</string>
+    <string name="schedules">Schedules</string>
+    <string name="todays_trains">Today\'s Trains</string>
+    <string name="upcoming_departures">Upcoming Departures</string>
+    <string name="search_train">Search Train Schedule</string>
+    <string name="search_train_schedule">Search Train Schedule</string>
+    <string name="station_info">Station Info</string>
+    <string name="stations">Stations</string>
+    <string name="routes">Popular Routes</string>
+    <string name="favorites">Favorites</string>
+    <string name="weather">Weather</string>
+    <string name="namaz_timings">Namaz Timings</string>
+    <string name="railway_news">Railway News</string>
+    <string name="freight_trains">Freight Trains</string>
+    <string name="home">Home</string>
+    <string name="profile">Profile</string>
+    <string name="settings">Settings</string>
+    <string name="about">About</string>
+    <string name="departure">Departure</string>
+    <string name="arrival">Arrival</string>
+    <string name="source_station">Source Station</string>
+    <string name="destination_station">Destination Station</string>
 </resources>

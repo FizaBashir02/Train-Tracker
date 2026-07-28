@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Train Tracker"
+rootProject.name = "Train Schedule"
 
 include(":app")

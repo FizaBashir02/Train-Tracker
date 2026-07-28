@@ -60,8 +60,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Navigation backstack simulation ---
-    private val screenStack = mutableListOf<Screen>(Screen.Splash)
-    var currentScreen by mutableStateOf<Screen>(Screen.Splash)
+    private val screenStack = mutableListOf<Screen>(Screen.Home)
+    var currentScreen by mutableStateOf<Screen>(Screen.Home)
         private set
 
     val canGoBack: Boolean get() = screenStack.size > 1 && currentScreen != Screen.Home && currentScreen != Screen.Splash && currentScreen != Screen.Login
